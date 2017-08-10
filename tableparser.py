@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+"""HTML Table parser"""
+
 import sys
 import re
 from itertools import product
@@ -25,16 +27,11 @@ class Table:
             for td in tds:
                 while (y, x) in self.table_map:
                     x += 1
-                data, dx, dy = self._parse_td(td)
-                for p in product(range(y, y + dy), range(x, x + dx)):
-                    self.table_map[p] = data
-                x += dx
-
-    def _parse_td(self, td):
-        dx = int(td.get("colspan", 1))
-        dy = int(td.get("rowspan", 1))
-        data = reduce(lambda x, y: x + y, list(td.stripped_strings), "")
-        return data, dx, dy
+                cell = Cell(td)
+                for p in product(range(y, y + cell.dy),
+                                 range(x, x + cell.dx)):
+                    self.table_map[p] = cell
+                x += cell.dx
 
     def to_string(self):
         old_y = 0
@@ -42,7 +39,7 @@ class Table:
         words = []
         lines = []
         for y, x in keys:
-            v = self.table_map[(y, x)]
+            v = str(self.table_map[(y, x)])
             if y == old_y:
                 words.append(v)
             else:
@@ -55,6 +52,22 @@ class Table:
             lines.append("\t".join(words))
 
         return "\n".join(lines)
+
+
+class Cell:
+    def __init__(self, soup):
+        self.soup = soup
+        self.dx = int(soup.get("colspan", 1))
+        self.dy = int(soup.get("rowspan", 1))
+
+    def __str__(self):
+        if not hasattr(self, "_string_cache"):
+            self._string_cache = reduce(lambda x, y: x + y,
+                                        list(self.soup.stripped_strings), "")
+        return self._string_cache
+
+    def is_header(self):
+        return self.soup.name == 'th'
 
 
 if __name__ =='__main__':
