@@ -66,6 +66,8 @@ if __name__ =='__main__':
                        help='show all table')
     group.add_argument('-n', '--table-num', type=int, metavar='num',
                        action='append', help='table number')
+    parser.add_argument('--dump', action='store_true',
+                        help='dump html source.')
     args = parser.parse_args()
     with urlopen(args.url) as f:
         text = f.read()
@@ -77,5 +79,8 @@ if __name__ =='__main__':
                 continue
             t = Table(table)
             print("Table %d:" % count)
-            print(t.to_string())
+            if not args.dump:
+                print(t.to_string())
+            else:
+                print(t.soup)
             print()
