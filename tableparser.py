@@ -56,10 +56,26 @@ class Table:
 
         return "\n".join(lines)
 
-with urlopen(sys.argv[1]) as f:
-    text = f.read()
-    text = text.replace("\n", "")
-    soup = BeautifulSoup(text, "lxml")
-    tables = soup.find_all("table")
-    for table in tables:
-        t = Table(table)
+
+if __name__ =='__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='HTML Table Parser')
+    parser.add_argument('url', help='target URL')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('-a', '--all', action='store_true',
+                       help='show all table')
+    group.add_argument('-n', '--table-num', type=int, metavar='num',
+                       action='append', help='table number')
+    args = parser.parse_args()
+    with urlopen(args.url) as f:
+        text = f.read()
+        text = text.replace(b"\n", b"").replace(b"\r", b"")
+        soup = BeautifulSoup(text, "lxml")
+        tables = soup.find_all("table")
+        for count, table in enumerate(tables, 1):
+            if not args.all and count not in args.table_num:
+                continue
+            t = Table(table)
+            print("Table %d:" % count)
+            print(t.to_string())
+            print()
