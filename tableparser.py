@@ -36,9 +36,25 @@ class Table:
         data = reduce(lambda x, y: x + y, list(td.stripped_strings), "")
         return data, dx, dy
 
+    def to_string(self):
+        old_y = 0
+        keys = sorted(self.table_map)
+        words = []
+        lines = []
+        for y, x in keys:
+            v = self.table_map[(y, x)]
+            if y == old_y:
+                words.append(v)
+            else:
+                lines.append("\t".join(words))
+                if y - old_y > 1:
+                    lines.append("\n" * (y - old_y -1))
+                words = [v]
+            old_y = y
+        if(len(words) > 0):
+            lines.append("\t".join(words))
 
-def main():
-    pass
+        return "\n".join(lines)
 
 with urlopen(sys.argv[1]) as f:
     text = f.read()
