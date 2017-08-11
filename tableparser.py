@@ -3,7 +3,6 @@
 
 """HTML Table parser"""
 
-import sys
 import re
 from itertools import product
 from functools import reduce
@@ -12,14 +11,19 @@ from bs4 import BeautifulSoup
 
 
 class Table:
+    """
+    Table Tag Parser
+    This class analyzes row and col of Table and
+    convert HTML Table to TSV(Tab-Separated Values).
+    """
     def __init__(self, soup):
         self.soup = soup
         self.table_map = {}
-        self.parse_table(soup)
+        self._parse_table(soup)
 
-    def parse_table(self, table):
+    def _parse_table(self, table):
         re_td = re.compile("t[hd]")
-        tbody = self.soup.tbody if self.soup.tbody else self.soup
+        tbody = table.tbody if table.tbody else table
         trs = tbody.find_all("tr", recursive=False)
         for y, tr in enumerate(trs):
             x = 0
@@ -45,16 +49,20 @@ class Table:
             else:
                 lines.append("\t".join(words))
                 if y - old_y > 1:
-                    lines.append("\n" * (y - old_y -1))
+                    lines.append("\n" * (y - old_y - 2))
                 words = [v]
             old_y = y
-        if(len(words) > 0):
+        if words:
             lines.append("\t".join(words))
 
         return "\n".join(lines)
 
 
 class Cell:
+    """
+    Table Data Parser
+    This class extracts "TD" tag contents.
+    """
     def __init__(self, soup):
         self.soup = soup
         self.dx = int(soup.get("colspan", 1))
@@ -70,7 +78,7 @@ class Cell:
         return self.soup.name == 'th'
 
 
-if __name__ =='__main__':
+def main():
     import argparse
     parser = argparse.ArgumentParser(description='HTML Table Parser')
     parser.add_argument('url', help='target URL')
@@ -90,10 +98,15 @@ if __name__ =='__main__':
         for count, table in enumerate(tables, 1):
             if not args.all and count not in args.table_num:
                 continue
-            t = Table(table)
             print("Table %d:" % count)
             if not args.dump:
-                print(t)
+                print(Table(table))
             else:
-                print(t.soup)
+                print(table)
             print()
+    return 0
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main())
