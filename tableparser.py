@@ -33,7 +33,7 @@ class Table:
                     self.table_map[p] = cell
                 x += cell.dx
 
-    def to_string(self):
+    def __str__(self):
         old_y = 0
         keys = sorted(self.table_map)
         words = []
@@ -93,7 +93,7 @@ if __name__ =='__main__':
             t = Table(table)
             print("Table %d:" % count)
             if not args.dump:
-                print(t.to_string())
+                print(t)
             else:
                 print(t.soup)
             print()
