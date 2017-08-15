@@ -103,12 +103,14 @@ def main():
         for count, table in enumerate(tables, 1):
             if not args.all and count not in args.table_num:
                 continue
-            print("Table %d:" % count)
+            if len(tables) != 1:
+                print("Table %d:" % count)
             if not args.dump:
                 print(Table(table))
             else:
                 print(table)
             print()
+
     return 0
 
 
