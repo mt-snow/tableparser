@@ -79,6 +79,10 @@ class Cell:
 
 
 def main():
+    class AllContains:
+        def __contains__(self, target):
+            return True
+
     import argparse
     parser = argparse.ArgumentParser(description='HTML Table Parser')
     parser.add_argument('url', help='target URL')
@@ -86,7 +90,8 @@ def main():
     group.add_argument('-a', '--all', action='store_true',
                        help='show all table')
     group.add_argument('-n', '--table-num', type=int, metavar='num',
-                       action='append', help='table number')
+                       action='append', help='table number',
+                       default=AllContains())
     parser.add_argument('--dump', action='store_true',
                         help='dump html source.')
     args = parser.parse_args()
