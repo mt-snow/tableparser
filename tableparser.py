@@ -4,7 +4,7 @@
 """HTML Table parser"""
 
 import re
-from itertools import product
+from itertools import product, zip_longest
 from functools import reduce
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
@@ -23,39 +23,49 @@ class Table:
 
     def _parse_table(self, table):
         re_td = re.compile("t[hd]")
+        trs = []
+        if table.thead:
+            thead_trs = table.thead.find_all("tr", recursive=False)
+            trs += zip_longest(thead_trs, [True])
         tbody = table.tbody if table.tbody else table
-        trs = tbody.find_all("tr", recursive=False)
-        for y, tr in enumerate(trs):
+        tbody_trs = tbody.find_all("tr", recursive=False)
+        trs += zip_longest(tbody_trs, [False])
+        for y, (tr, header_flag) in enumerate(trs):
             x = 0
             tds = tr.find_all(re_td)
             for td in tds:
                 while (y, x) in self.table_map:
                     x += 1
-                cell = Cell(td)
+                cell = Cell(td, header_flag)
                 for p in product(range(y, y + cell.dy),
                                  range(x, x + cell.dx)):
                     self.table_map[p] = cell
                 x += cell.dx
 
-    def __str__(self):
+    def get_strings(self, with_header=True):
         old_y = 0
         keys = sorted(self.table_map)
         words = []
         lines = []
         for y, x in keys:
-            v = str(self.table_map[(y, x)])
+            v = self.table_map[(y, x)]
+            if not with_header and v.is_header():
+                continue
             if y == old_y:
-                words.append(v)
+                words.append(str(v))
             else:
                 lines.append("\t".join(words))
                 if y - old_y > 1:
                     lines.append("\n" * (y - old_y - 2))
-                words = [v]
+                words = [str(v)]
             old_y = y
         if words:
             lines.append("\t".join(words))
 
         return "\n".join(lines)
+
+    def __str__(self):
+        return self.get_strings()
 
 
 class Cell:
@@ -63,10 +73,11 @@ class Cell:
     Table Data Parser
     This class extracts "TD" tag contents.
     """
-    def __init__(self, soup):
+    def __init__(self, soup, in_thead=False):
         self.soup = soup
         self.dx = int(soup.get("colspan", 1))
         self.dy = int(soup.get("rowspan", 1))
+        self.in_thead = in_thead
 
     def __str__(self):
         if not hasattr(self, "_string_cache"):
@@ -75,7 +86,7 @@ class Cell:
         return self._string_cache
 
     def is_header(self):
-        return self.soup.name == 'th'
+        return self.in_thead or self.soup.name == 'th'
 
 
 def main():
@@ -94,6 +105,10 @@ def main():
                        default=AllContains())
     parser.add_argument('--dump', action='store_true',
                         help='dump html source.')
+    parser.add_argument('--with-header', action='store_true',
+                        default=True, dest="header", help='with header')
+    parser.add_argument('--without-header', action='store_false',
+                        dest="header", help='without header')
     args = parser.parse_args()
     with urlopen(args.url) as f:
         text = f.read()
@@ -108,7 +123,7 @@ def main():
             if not args.dump:
                 print(Table(table))
             else:
-                print(table)
+                print(Table(table).get_strings(with_header=args.header))
             print()
 
     return 0
