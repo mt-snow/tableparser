@@ -27,7 +27,7 @@ class Table:
         trs = tbody.find_all("tr", recursive=False)
         for y, tr in enumerate(trs):
             x = 0
-            tds = tr.find_all(re_td)
+            tds = tr.find_all(re_td, recursive=False)
             for td in tds:
                 while (y, x) in self.table_map:
                     x += 1
