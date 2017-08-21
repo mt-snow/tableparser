@@ -19,12 +19,14 @@ class Table:
     def __init__(self, soup):
         self.soup = soup
         self.table_map = {}
+        self.table_size = (0, 0)
         self._parse_table(soup)
 
     def _parse_table(self, table):
         re_td = re.compile("t[hd]")
         tbody = table.tbody if table.tbody else table
         trs = tbody.find_all("tr", recursive=False)
+        x = 0
         for y, tr in enumerate(trs):
             x = 0
             tds = tr.find_all(re_td, recursive=False)
@@ -36,6 +38,7 @@ class Table:
                                  range(x, x + cell.dx)):
                     self.table_map[p] = cell
                 x += cell.dx
+        self.table_size = (len(trs), x)
 
     def __str__(self):
         old_y = 0
@@ -56,6 +59,26 @@ class Table:
             lines.append("\t".join(words))
 
         return "\n".join(lines)
+
+    def get_title(self):
+        if self.soup.caption:
+            return reduce(lambda x, y: x + y,
+                          list(self.soup.caption.stripped_strings), "")
+        if (self.table_map[(0, 0)].is_header() and
+                self.table_map[(0, 0)].dx == self.table_size[1]):
+            return reduce(
+                lambda x, y: x + y,
+                list(self.table_map[(0, 0)].soup.stripped_strings),
+                ""
+                )
+        target = self.soup.previous_sibling
+        while target is not None and target.name != "table":
+            if target.name is not None and re.match(r'h[1-6]$', target.name):
+                return reduce(lambda x, y: x + y,
+                              list(target.stripped_strings), "")
+            target = target.previous_sibling
+        return "\t".join([str(self.table_map[(0, x)])
+                          for x in range(0, self.table_size[1])])
 
 
 class Cell:
@@ -84,12 +107,19 @@ def main():
     parser.add_argument('url', help='target URL')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true',
-                       help='show all table')
+                       help='show all table', default=False)
     group.add_argument('-n', '--table-num', type=int, metavar='num',
-                       action='append', help='table number')
+                       action='append', help='table number', default=[])
+    parser.add_argument('--without-contents', action='store_false',
+                        dest="contents_flag",
+                        help='dosen\'t show table contents')
     parser.add_argument('--dump', action='store_true',
                         help='dump html source.')
     args = parser.parse_args()
+    if args.contents_flag and not args.all and not args.table_num:
+        args.contents_flag = False
+        args.all = True
+
     with urlopen(args.url) as f:
         text = f.read()
         text = text.replace(b"\n", b"").replace(b"\r", b"")
@@ -98,11 +128,12 @@ def main():
         for count, table in enumerate(tables, 1):
             if not args.all and count not in args.table_num:
                 continue
-            print("Table %d:" % count)
-            if not args.dump:
-                print(Table(table))
-            else:
+            t = Table(table)
+            print("Table %d: %s" % (count, t.get_title()))
+            if args.dump:
                 print(table)
+            elif args.contents_flag:
+                print(t)
             print()
     return 0
 
