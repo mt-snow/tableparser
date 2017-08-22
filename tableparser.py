@@ -60,7 +60,16 @@ class Table:
 
         return "\n".join(lines)
 
-    def get_title(self):
+    def get_title(self, length=30):
+        """
+        return table title whose length is limitied to 'length'.
+        If length = 0, return full-long title.
+        """
+        if length != 0:
+            return_txt = self.get_title(length=0)
+            if len(return_txt) <= length:
+                return return_txt
+            return return_txt[0:length-3] + "..."
         if self.soup.caption:
             return reduce(lambda x, y: x + y,
                           list(self.soup.caption.stripped_strings), "")
