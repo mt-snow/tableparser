@@ -7,6 +7,7 @@ import re
 from itertools import product
 from functools import reduce
 from urllib.request import urlopen
+from urllib.parse import quote
 from bs4 import BeautifulSoup
 
 
@@ -144,6 +145,15 @@ def main():
     if args.contents_flag and not args.all and not args.table_num:
         args.contents_flag = False
         args.all = True
+
+    def urlencode_ch(m):
+        t = m.groups()
+        if t[0]:
+            return t[0]
+        return quote(t[1])
+    args.url = re.sub(r"""([A-Za-z0-9._~!$&'()*+,;?=:@-]|"""
+                      r"""%[A-Fa-f0-9]{2})|(.)""",
+                      urlencode_ch, args.url)
 
     with urlopen(args.url) as f:
         text = f.read()
