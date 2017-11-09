@@ -138,12 +138,14 @@ def main():
             if not args.all and count not in args.table_num:
                 continue
             t = Table(table)
-            print("Table %d: %s" % (count, t.get_title()))
+            if len(tables) != 1:
+                print("Table %d: %s" % (count, t.get_title()))
             if args.dump:
                 print(table)
             elif args.contents_flag:
                 print(t)
             print()
+
     return 0
 
 
