@@ -23,37 +23,45 @@ class Table:
         self._parse_table(soup)
 
     def _parse_table(self, table):
-        re_td = re.compile("t[hd]")
+        if table.thead:
+            thead_trs = table.thead.find_all("tr", recursive=False)
+            self._add_cells(thead_trs, header_flag=True)
         tbody = table.tbody if table.tbody else table
-        trs = tbody.find_all("tr", recursive=False)
+        tbody_trs = tbody.find_all("tr", recursive=False)
+        self._add_cells(tbody_trs, header_flag=False)
+
+    def _add_cells(self, trs, header_flag):
+        re_td = re.compile("t[hd]")
         x = 0
-        for y, tr in enumerate(trs):
+        for y, tr in enumerate(trs, start=self.table_size[0]):
             x = 0
             tds = tr.find_all(re_td, recursive=False)
             for td in tds:
                 while (y, x) in self.table_map:
                     x += 1
-                cell = Cell(td)
+                cell = Cell(td, header_flag)
                 for p in product(range(y, y + cell.dy),
                                  range(x, x + cell.dx)):
                     self.table_map[p] = cell
                 x += cell.dx
-        self.table_size = (len(trs), x)
+        self.table_size = (self.table_size[0] + len(trs), x)
 
-    def __str__(self):
+    def get_strings(self, with_header=True):
         old_y = 0
         keys = sorted(self.table_map)
         words = []
         lines = []
         for y, x in keys:
-            v = str(self.table_map[(y, x)])
+            v = self.table_map[(y, x)]
+            if not with_header and v.is_header():
+                continue
             if y == old_y:
-                words.append(v)
+                words.append(str(v))
             else:
                 lines.append("\t".join(words))
                 if y - old_y > 1:
                     lines.append("\n" * (y - old_y - 2))
-                words = [v]
+                words = [str(v)]
             old_y = y
         if words:
             lines.append("\t".join(words))
@@ -89,16 +97,20 @@ class Table:
         return "\t".join([str(self.table_map[(0, x)])
                           for x in range(0, self.table_size[1])])
 
+    def __str__(self):
+        return self.get_strings()
+
 
 class Cell:
     """
     Table Data Parser
     This class extracts "TD" tag contents.
     """
-    def __init__(self, soup):
+    def __init__(self, soup, in_thead=False):
         self.soup = soup
         self.dx = int(soup.get("colspan", 1))
         self.dy = int(soup.get("rowspan", 1))
+        self.in_thead = in_thead
 
     def __str__(self):
         if not hasattr(self, "_string_cache"):
@@ -107,7 +119,7 @@ class Cell:
         return self._string_cache
 
     def is_header(self):
-        return self.soup.name == 'th'
+        return self.in_thead or self.soup.name == 'th'
 
 
 def main():
@@ -124,6 +136,10 @@ def main():
                         help='dosen\'t show table contents')
     parser.add_argument('--dump', action='store_true',
                         help='dump html source.')
+    parser.add_argument('--with-header', action='store_true',
+                        default=True, dest="header", help='with header')
+    parser.add_argument('--without-header', action='store_false',
+                        dest="header", help='without header')
     args = parser.parse_args()
     if args.contents_flag and not args.all and not args.table_num:
         args.contents_flag = False
@@ -143,7 +159,7 @@ def main():
             if args.dump:
                 print(table)
             elif args.contents_flag:
-                print(t)
+                print(t.get_strings(with_header=args.header))
             print()
 
     return 0
