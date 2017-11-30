@@ -12,7 +12,7 @@ class WikipediaSearch:
     def __init__(self, keyword, limit=10):
         def generator(soup):
             if self.next_id != 0:
-                # if next_id is changed before first call, requery 
+                # if next_id is changed before first call, requery
                 query['sroffset'] = self.next_id
                 soup = get_api_result
             while True:
@@ -33,14 +33,14 @@ class WikipediaSearch:
                     break
 
         query = {
-                'format': 'xml',
-                'action': 'query',
-                'list': 'search',
-                'srsearch': keyword,
-                'srlimit': limit,
-                'srprop': 'titlesnippet',
+            'format': 'xml',
+            'action': 'query',
+            'list': 'search',
+            'srsearch': keyword,
+            'srlimit': limit,
+            'srprop': 'titlesnippet',
             }
-        
+
         soup = get_api_result(query)
         self.total_hits = int(soup.searchinfo['totalhits'])
         self.limit = limit
@@ -59,10 +59,10 @@ def get_page_source(title_or_id):
     get wiki source by title or page_id.
     """
     query = {
-            'format': 'xml',
-            'action': 'query',
-            'prop': 'revisions',
-            'rvprop': 'content',
+        'format': 'xml',
+        'action': 'query',
+        'prop': 'revisions',
+        'rvprop': 'content',
         }
     if isinstance(title_or_id, int):
         query['pageids'] = title_or_id
@@ -74,8 +74,7 @@ def get_page_source(title_or_id):
     result = get_api_result(query)
     if result.rev is None:
         return None
-    else:
-        return result.rev.string
+    return result.rev.string
 
 
 def get_api_result(query_dict):
