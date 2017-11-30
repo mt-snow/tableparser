@@ -43,7 +43,7 @@ class WikipediaSearch:
         
         soup = get_api_result(query)
         self.total_hits = int(soup.searchinfo['totalhits'])
-        self.limit = 10
+        self.limit = limit
         self.next_id = 0
         self._gen = generator(soup)
 
@@ -52,6 +52,30 @@ class WikipediaSearch:
 
     def __next__(self):
         return next(self._gen)
+
+
+def get_page_source(title_or_id):
+    """
+    get wiki source by title or page_id.
+    """
+    query = {
+            'format': 'xml',
+            'action': 'query',
+            'prop': 'revisions',
+            'rvprop': 'content',
+        }
+    if isinstance(title_or_id, int):
+        query['pageids'] = title_or_id
+    elif isinstance(title_or_id, str):
+        query['titles'] = title_or_id
+    else:
+        raise TypeError('title_or_id must be str or int.')
+
+    result = get_api_result(query)
+    if result.rev is None:
+        return None
+    else:
+        return result.rev.string
 
 
 def get_api_result(query_dict):
