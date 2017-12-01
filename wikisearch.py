@@ -80,9 +80,9 @@ def get_api_result(query_dict):
         return BeautifulSoup(f.read().decode(), 'xml')
 
 
-if __name__ == '__main__':
-    import sys
-    gen = enumerate(WikipediaSearch(sys.argv[1]), start=1)
+def show_search_result(keyword, **args):
+    del args
+    gen = enumerate(WikipediaSearch(keyword, limit=50), start=1)
     key = ''
     while 'q' not in key:
         print('#\tpageid\ttitle')
@@ -92,3 +92,38 @@ if __name__ == '__main__':
             except StopIteration:
                 return
         key = input(':')
+
+
+def show_source(title_or_id, **args):
+    del args
+    if title_or_id.isdecimal():
+        print(get_page_source(int(title_or_id)))
+    else:
+        print(get_page_source(title_or_id))
+
+
+def _main(argv):
+    import argparse
+    parser = argparse.ArgumentParser()
+    sub_parsers = parser.add_subparsers(title='Actions')
+    sub_parsers.required = True
+    sub_parsers.dest = 'action'
+
+    search_parser = sub_parsers.add_parser(
+        'search', aliases=['s'],
+        help='search keyword and show titles and page_ids')
+    search_parser.add_argument('keyword')
+    search_parser.set_defaults(func=show_search_result)
+
+    get_parser = sub_parsers.add_parser(
+        'get_source', aliases=['get', 'g'],
+        help='get wiki source by title or page id')
+    get_parser.add_argument('title_or_id')
+    get_parser.set_defaults(func=show_source)
+
+    args = parser.parse_args(argv[1:])
+    args.func(**vars(args))
+
+if __name__ == '__main__':
+    import sys
+    _main(sys.argv)
