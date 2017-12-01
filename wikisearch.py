@@ -8,48 +8,35 @@ from bs4 import BeautifulSoup
 API_BASE_URL = 'https://ja.wikipedia.org/w/api.php?'
 
 
-class WikipediaSearch:
-    def __init__(self, keyword, limit=10):
-        def generator(soup):
-            if self.next_id != 0:
-                # if next_id is changed before first call, requery
-                query['sroffset'] = self.next_id
-                soup = get_api_result
-            while True:
-                continue_flag = False
-                items = soup.find_all('p')
-                for item in items:
-                    self.next_id += 1
-                    next_id_cache = self.next_id
-                    yield item.attrs
-                    if next_id_cache != self.next_id:
-                        continue_flag = True
-                        break
-                if continue_flag or soup.find('continue'):
-                    query['srlimit'] = self.limit
-                    query['sroffset'] = self.next_id
-                    soup = get_api_result(query)
-                else:
-                    break
-
+def search(keyword, limit=10):
+    """
+    search page by keyword
+    return generator object.
+    """
+    def generator(keyword, limit):
+        next_id = 0
         query = {
             'list': 'search',
             'srsearch': keyword,
             'srlimit': limit,
             'srprop': 'titlesnippet',
             }
-
         soup = get_api_result(query)
-        self.total_hits = int(soup.searchinfo['totalhits'])
-        self.limit = limit
-        self.next_id = 0
-        self._gen = generator(soup)
+        yield int(soup.searchinfo['totalhits'])
 
-    def __iter__(self):
-        return iter(self._gen)
+        while True:
+            items = soup.find_all('p')
+            for item in items:
+                next_id += 1
+                yield item.attrs
+            if soup.find('continue'):
+                soup = get_api_result(query)
+            else:
+                break
 
-    def __next__(self):
-        return next(self._gen)
+    gen = generator(keyword, limit)
+
+    return gen, next(gen)
 
 
 def get_page_source(title_or_id):
@@ -74,6 +61,11 @@ def get_page_source(title_or_id):
 
 
 def get_api_result(query_dict):
+    """
+    query wiki api
+    query_dict is media wiki format without format or action.
+    return beautiful soup xml object.
+    """
     query_dict.update({'format': 'xml', 'action': 'query'})
     query = urllib.parse.urlencode(query_dict)
     with urlopen(API_BASE_URL + query) as f:
@@ -82,7 +74,9 @@ def get_api_result(query_dict):
 
 def show_search_result(keyword, **args):
     del args
-    gen = enumerate(WikipediaSearch(keyword, limit=50), start=1)
+    gen, total = search(keyword, limit=50)
+    gen = enumerate(gen, start=1)
+    print('total: %d' % total)
     key = ''
     while 'q' not in key:
         print('#\tpageid\ttitle')
