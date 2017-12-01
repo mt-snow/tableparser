@@ -33,8 +33,6 @@ class WikipediaSearch:
                     break
 
         query = {
-            'format': 'xml',
-            'action': 'query',
             'list': 'search',
             'srsearch': keyword,
             'srlimit': limit,
@@ -59,8 +57,6 @@ def get_page_source(title_or_id):
     get wiki source by title or page_id.
     """
     query = {
-        'format': 'xml',
-        'action': 'query',
         'prop': 'revisions',
         'rvprop': 'content',
         }
@@ -78,6 +74,7 @@ def get_page_source(title_or_id):
 
 
 def get_api_result(query_dict):
+    query_dict.update({'format': 'xml', 'action': 'query'})
     query = urllib.parse.urlencode(query_dict)
     with urlopen(API_BASE_URL + query) as f:
         return BeautifulSoup(f.read().decode(), 'xml')
