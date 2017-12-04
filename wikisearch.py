@@ -1,5 +1,8 @@
 #! /usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""wikipedia api command"""
+
 import urllib.parse
 from urllib.request import urlopen
 import regex
@@ -14,7 +17,7 @@ def search(keyword, limit=10):
     search page by keyword
     return generator object.
     """
-    def generator(keyword, limit):
+    def _generator(keyword, limit):
         next_id = 0
         query = {
             'list': 'search',
@@ -35,7 +38,7 @@ def search(keyword, limit=10):
             else:
                 break
 
-    gen = generator(keyword, limit)
+    gen = _generator(keyword, limit)
 
     return gen, next(gen)
 
@@ -97,11 +100,12 @@ def get_api_result(query_dict):
     """
     query_dict.update({'format': 'xml', 'action': 'query'})
     query = urllib.parse.urlencode(query_dict)
-    with urlopen(API_BASE_URL + query) as f:
-        return BeautifulSoup(f.read().decode(), 'xml')
+    with urlopen(API_BASE_URL + query) as xml:
+        return BeautifulSoup(xml.read().decode(), 'xml')
 
 
 def show_search_result(keyword, **_):
+    """print search result"""
     gen, total = search(keyword, limit=50)
     gen = enumerate(gen, start=1)
     print('total: %d' % total)
