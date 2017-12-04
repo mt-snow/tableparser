@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import urllib.parse
 from urllib.request import urlopen
+import regex
 from bs4 import BeautifulSoup
 
 
@@ -60,6 +61,27 @@ def get_page_source(title_or_id):
     return result.rev.string
 
 
+def parse_infoboxes(source):
+    """
+    parse infoboxes with wiki source
+    return infobox name and list of parameter name and value.
+    (<infobox name>, [[<param name>, <param value>, ...]])
+    """
+    infoboxes = regex.finditer(
+        r'\{\{Infobox (?P<name>[\w/]*)'
+        r'(?<content>(?:[^{}]|(?<quote>'
+        r'\{\{(?:[^{}]|(?&quote))*\}\}))*)\}\}',
+        source.replace('\n', ''))
+    for box in infoboxes:
+        template_name, params, _ = box.groups()
+        params = regex.findall(
+            r'([^=|]+)(?:=(?P<quote>(?:[^{}\[\]|]|'
+            r'\{\{(?:(?P&quote)|\|)*\}\}|'
+            r'\[\[(?:(?P&quote)|\|)*\]\])*))?',
+            params)
+        yield template_name, [param[:2] for param in params]
+
+
 def get_api_result(query_dict):
     """
     query wiki api
@@ -96,6 +118,21 @@ def show_source(title_or_id, **args):
         print(get_page_source(title_or_id))
 
 
+def show_infobox(title_or_id, **_):
+    """show infobox params"""
+    if title_or_id.isdecimal():
+        source = get_page_source(int(title_or_id))
+    else:
+        source = get_page_source(title_or_id)
+
+    infoboxes = parse_infoboxes(source)
+    for name, params in infoboxes:
+        print('Infobox ' + name)
+        for param in params:
+            print(param[0] + ' = ' + param[1])
+        print('')
+
+
 def _main(argv):
     import argparse
     parser = argparse.ArgumentParser()
@@ -114,6 +151,12 @@ def _main(argv):
         help='get wiki source by title or page id')
     get_parser.add_argument('title_or_id')
     get_parser.set_defaults(func=show_source)
+
+    get_parser = sub_parsers.add_parser(
+        'show_infobox', aliases=['sh'],
+        help='show infobox')
+    get_parser.add_argument('title_or_id')
+    get_parser.set_defaults(func=show_infobox)
 
     args = parser.parse_args(argv[1:])
     args.func(**vars(args))
