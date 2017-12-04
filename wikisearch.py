@@ -123,6 +123,9 @@ def show_infobox(title_or_id, **_):
         source = get_page_source(int(title_or_id))
     else:
         source = get_page_source(title_or_id)
+    if not source:
+        print(None)
+        return
 
     infoboxes = parse_infoboxes(source)
     for name, params in infoboxes:
