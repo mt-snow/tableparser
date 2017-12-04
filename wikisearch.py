@@ -61,6 +61,13 @@ def get_page_source(title_or_id):
     return result.rev.string
 
 
+def unlink(source):
+    """remove link from wiki source"""
+    return regex.sub(r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]',
+                     lambda match: match[2] if match[2] else match[1],
+                     source)
+
+
 def parse_infoboxes(source):
     """
     parse infoboxes with wiki source
@@ -109,15 +116,19 @@ def show_search_result(keyword, **_):
         key = input(':')
 
 
-def show_source(title_or_id, **_):
+def show_source(title_or_id, unlink_flag, **_):
     """show wiki source"""
     if title_or_id.isdecimal():
-        print(get_page_source(int(title_or_id)))
+        source = get_page_source(int(title_or_id))
     else:
-        print(get_page_source(title_or_id))
+        source = get_page_source(title_or_id)
+
+    if unlink_flag:
+        source = unlink(source)
+    print(source)
 
 
-def show_infobox(title_or_id, **_):
+def show_infobox(title_or_id, unlink_flag, **_):
     """show infobox params"""
     if title_or_id.isdecimal():
         source = get_page_source(int(title_or_id))
@@ -126,6 +137,8 @@ def show_infobox(title_or_id, **_):
     if not source:
         print(None)
         return
+    if unlink_flag:
+        source = unlink(source)
 
     infoboxes = parse_infoboxes(source)
     for name, params in infoboxes:
@@ -152,12 +165,16 @@ def _main(argv):
         'get_source', aliases=['get', 'g'],
         help='get wiki source by title or page id')
     get_parser.add_argument('title_or_id')
+    get_parser.add_argument('--unlink', dest='unlink_flag',
+                            action='store_true', help='remove link')
     get_parser.set_defaults(func=show_source)
 
     get_parser = sub_parsers.add_parser(
         'show_infobox', aliases=['sh'],
         help='show infobox')
     get_parser.add_argument('title_or_id')
+    get_parser.add_argument('--unlink', dest='unlink_flag',
+                            action='store_true', help='remove link')
     get_parser.set_defaults(func=show_infobox)
 
     args = parser.parse_args(argv[1:])
