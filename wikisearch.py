@@ -94,8 +94,7 @@ def get_api_result(query_dict):
         return BeautifulSoup(f.read().decode(), 'xml')
 
 
-def show_search_result(keyword, **args):
-    del args
+def show_search_result(keyword, **_):
     gen, total = search(keyword, limit=50)
     gen = enumerate(gen, start=1)
     print('total: %d' % total)
@@ -110,8 +109,8 @@ def show_search_result(keyword, **args):
         key = input(':')
 
 
-def show_source(title_or_id, **args):
-    del args
+def show_source(title_or_id, **_):
+    """show wiki source"""
     if title_or_id.isdecimal():
         print(get_page_source(int(title_or_id)))
     else:
