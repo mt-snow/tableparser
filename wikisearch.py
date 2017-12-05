@@ -43,7 +43,7 @@ def search(keyword, limit=10):
     return gen, next(gen)
 
 
-def get_page_source(title_or_id):
+def get_page_source(title_or_id, redirects_flag=True):
     """
     get wiki source by title or page_id.
     """
@@ -57,6 +57,8 @@ def get_page_source(title_or_id):
         query['titles'] = title_or_id
     else:
         raise TypeError('title_or_id must be str or int.')
+    if redirects_flag:
+        query['redirects'] = True
 
     result = get_api_result(query)
     if result.rev is None:
@@ -120,24 +122,24 @@ def show_search_result(keyword, **_):
         key = input(':')
 
 
-def show_source(title_or_id, unlink_flag, **_):
+def show_source(title_or_id, unlink_flag, redirects_flag, **_):
     """show wiki source"""
     if title_or_id.isdecimal():
-        source = get_page_source(int(title_or_id))
+        source = get_page_source(int(title_or_id), redirects_flag)
     else:
-        source = get_page_source(title_or_id)
+        source = get_page_source(title_or_id, redirects_flag)
 
     if unlink_flag:
         source = unlink(source)
     print(source)
 
 
-def show_infobox(title_or_id, unlink_flag, **_):
+def show_infobox(title_or_id, unlink_flag, redirects_flag, **_):
     """show infobox params"""
     if title_or_id.isdecimal():
-        source = get_page_source(int(title_or_id))
+        source = get_page_source(int(title_or_id), redirects_flag)
     else:
-        source = get_page_source(title_or_id)
+        source = get_page_source(title_or_id, redirects_flag)
     if not source:
         print(None)
         return
@@ -171,6 +173,8 @@ def _main(argv):
     get_parser.add_argument('title_or_id')
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
+    get_parser.add_argument('--no-redirects', dest='redirects_flag',
+                            action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=show_source)
 
     get_parser = sub_parsers.add_parser(
@@ -179,6 +183,8 @@ def _main(argv):
     get_parser.add_argument('title_or_id')
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
+    get_parser.add_argument('--no-redirects', dest='redirects_flag',
+                            action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=show_infobox)
 
     args = parser.parse_args(argv[1:])
