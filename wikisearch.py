@@ -5,6 +5,7 @@
 
 import urllib.parse
 from urllib.request import urlopen
+from collections import OrderedDict
 import regex
 from bs4 import BeautifulSoup
 
@@ -76,8 +77,8 @@ def unlink(source):
 def parse_infoboxes(source):
     """
     parse infoboxes with wiki source
-    return infobox name and list of parameter name and value.
-    (<infobox name>, [[<param name>, <param value>, ...]])
+    return iterator of infobox name and parameters dict.
+    (<infobox name>, {<param name>: <param value>, ...})
     """
     infoboxes = regex.finditer(
         r'\{\{Infobox (?P<name>[\w/]*)'
@@ -91,7 +92,7 @@ def parse_infoboxes(source):
             r'\{\{(?:(?P&quote)|\|)*\}\}|'
             r'\[\[(?:(?P&quote)|\|)*\]\])*))?',
             params)
-        yield template_name, [param[:2] for param in params]
+        yield template_name, OrderedDict([param[:2] for param in params])
 
 
 def get_api_result(query_dict):
@@ -149,8 +150,8 @@ def show_infobox(title_or_id, unlink_flag, redirects_flag, **_):
     infoboxes = parse_infoboxes(source)
     for name, params in infoboxes:
         print('Infobox ' + name)
-        for param in params:
-            print(param[0] + ' = ' + param[1])
+        for key, value in params.items():
+            print(key + ' = ' + value)
         print('')
 
 
