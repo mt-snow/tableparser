@@ -124,6 +124,57 @@ def parse_infoboxes(source):
         yield template_name, OrderedDict([param[:2] for param in params])
 
 
+def parse_infoboxes2(source):
+    """
+    parse infoboxes with wiki source
+    return iterator of infobox name and parameters dict.
+    (<infobox name>, {<param name>: <param value>, ...})
+    """
+    infoboxes = regex.finditer(
+        r'\{\{(?P<name>[^|{}]*)'
+        r'(?<content>(?:[^{}]|(?<quote>'
+        r'\{\{(?:[^{}]|(?&quote))*\}\}))*)\}\}',
+        source.replace('\n', ''))
+    non_infobox_templates = set()
+    for box in infoboxes:
+        infobox_flag = True
+        check_templates = set()
+        template_name, params, _ = box.groups()
+        name = template_name
+        indent = 0
+        while not name.startswith('Infobox'):
+            if name in non_infobox_templates:
+                infobox_flag = False
+                break
+            print("\t" * indent + name)
+            check_templates.add(name)
+            name = check_template_name(name.rstrip())
+            if not name:
+                infobox_flag = False
+                break
+            indent += 1
+        if not infobox_flag:
+            non_infobox_templates.update(check_templates)
+            continue
+
+        params = regex.findall(
+            r'([^=|]+)(?:=(?P<quote>(?:[^{}\[\]|]|'
+            r'\{\{(?:(?P&quote)|\|)*\}\}|'
+            r'\[\[(?:(?P&quote)|\|)*\]\])*))?',
+            params)
+        yield template_name, OrderedDict([param[:2] for param in params])
+
+
+def check_template_name(template_name):
+    source = get_page_source('Template:' + template_name)
+    if not source:
+        return None
+    match = regex.match(r'\{\{([^|{}]*)', source)
+    if not match:
+        return None
+    return match.group(1).rstrip()
+
+
 def get_api_result(query_dict):
     """
     query wiki api
