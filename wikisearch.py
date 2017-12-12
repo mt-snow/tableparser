@@ -67,6 +67,35 @@ def get_page_source(title_or_id, redirects_flag=True):
     return result.rev.string
 
 
+def get_page_sources(titles, redirects_flag=True):
+    """
+    get wiki sources by collection of titles.
+    """
+    query = {
+        'prop': 'revisions',
+        'rvprop': 'content',
+        }
+    if (hasattr(titles, '__iter__')
+            and any(not isinstance(obj, str) for obj in titles)):
+        raise TypeError('Titles_or_ids must be conllection of str.')
+    query['titles'] = "|".join(titles)
+    if redirects_flag:
+        query['redirects'] = True
+
+    result = get_api_result(query)
+
+    return_dict = {}
+    for title in titles:
+        normalized = title
+        item = result.find(['n', 'r'], **{'from': normalized})
+        while item:
+            normalized = item['to']
+            item = result.find(['n', 'r'], **{'from': normalized})
+        page = result.find('page', title=normalized)
+        return_dict[title] = page.rev.string if page.rev else None
+    return return_dict
+
+
 def unlink(source):
     """remove link from wiki source"""
     return regex.sub(r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]',
