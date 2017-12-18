@@ -117,9 +117,9 @@ def parse_infoboxes(source):
     for box in infoboxes:
         template_name, params, _ = box.groups()
         params = regex.findall(
-            r'([^=|]+)(?:=(?P<quote>(?:[^{}\[\]|]|'
+            r'\s*([^=|]+?)\s*(?:=\s*(?P<quote>(?:[^{}\[\]|]|'
             r'\{\{(?:(?P&quote)|\|)*\}\}|'
-            r'\[\[(?:(?P&quote)|\|)*\]\])*))?',
+            r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
             params)
         yield template_name, OrderedDict([param[:2] for param in params])
 
@@ -158,9 +158,9 @@ def parse_infoboxes2(source):
             continue
 
         params = regex.findall(
-            r'([^=|]+)(?:=(?P<quote>(?:[^{}\[\]|]|'
+            r'\s*([^=|]+?)\s*(?:=\s*(?P<quote>(?:[^{}\[\]|]|'
             r'\{\{(?:(?P&quote)|\|)*\}\}|'
-            r'\[\[(?:(?P&quote)|\|)*\]\])*))?',
+            r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
             params)
         yield template_name, OrderedDict([param[:2] for param in params])
 
