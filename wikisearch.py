@@ -191,6 +191,30 @@ def call_api(query_dict):
         return BeautifulSoup(xml.read().decode(), 'xml')
 
 
+def parse_anime_info(source):
+    """Parse infobox animanga."""
+    infoboxes = [item for item in parse_infoboxes(source)
+                 if item[0].startswith('animanga')]
+    animes = []
+    for name, params in infoboxes:
+        if name == 'animanga/Header':
+            series_title = params.get('タイトル')
+            break
+    for name, params in infoboxes:
+        if name in ('animanga/TVAnime', 'animanga/OVA'):
+            title = params.get('タイトル', series_title)
+            director = params.get('総監督', params.get('監督'))
+            studio = params.get('アニメーション制作')
+        elif name == 'animanga/Movie':
+            title = params.get('タイトル', series_title)
+            director = params.get('総監督', params.get('監督'))
+            studio = params.get('制作')
+        else:
+            continue
+        animes.append((name, series_title, title, director, studio))
+    return animes
+
+
 def print_search_result(keyword, **_):
     """Print search result by keyword."""
     gen, total = search(keyword, limit=50)
@@ -239,6 +263,19 @@ def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
         print('')
 
 
+def print_anime_info(title_or_id, **_):
+    """Print infoboxes and those params."""
+    if title_or_id.isdecimal():
+        source = get_page_source(int(title_or_id), redirects_flag=True)
+    else:
+        source = get_page_source(title_or_id, redirects_flag=True)
+    if not source:
+        print(None)
+        return
+    source = unlink(source)
+    print(parse_anime_info(source))
+
+
 def _main(argv):
     import argparse
     parser = argparse.ArgumentParser()
@@ -271,6 +308,12 @@ def _main(argv):
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
                             action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=print_infobox)
+
+    anime_parser = sub_parsers.add_parser(
+        'show_anime_info', aliases=['anime'],
+        help='show anime')
+    anime_parser.add_argument('title_or_id')
+    anime_parser.set_defaults(func=print_anime_info)
 
     args = parser.parse_args(argv[1:])
     args.func(**vars(args))
