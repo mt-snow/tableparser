@@ -26,7 +26,7 @@ def search(keyword, limit=10):
             'srlimit': limit,
             'srprop': 'titlesnippet',
             }
-        soup = get_api_result(query)
+        soup = call_api(query)
         yield int(soup.searchinfo['totalhits'])
 
         while True:
@@ -35,7 +35,7 @@ def search(keyword, limit=10):
                 next_id += 1
                 yield item.attrs
             if soup.find('continue'):
-                soup = get_api_result(query)
+                soup = call_api(query)
             else:
                 break
 
@@ -61,7 +61,7 @@ def get_page_source(title_or_id, redirects_flag=True):
     if redirects_flag:
         query['redirects'] = True
 
-    result = get_api_result(query)
+    result = call_api(query)
     if result.rev is None:
         return None
     return result.rev.string
@@ -82,7 +82,7 @@ def get_page_sources(titles, redirects_flag=True):
     if redirects_flag:
         query['redirects'] = True
 
-    result = get_api_result(query)
+    result = call_api(query)
 
     return_dict = {}
     for title in titles:
@@ -176,9 +176,9 @@ def check_template_name(template_name):
     return match.group(1).rstrip()
 
 
-def get_api_result(query_dict):
+def call_api(query_dict):
     """
-    Call wiki api, returning beatutiful soup xml object.
+    Call wikipedia api, returning beatutiful soup xml object.
 
     Query_dict must be formed acording to media wiki api,
     and 'format' and 'action' params overwiritten to 'xml' and 'query'.
@@ -189,7 +189,7 @@ def get_api_result(query_dict):
         return BeautifulSoup(xml.read().decode(), 'xml')
 
 
-def show_search_result(keyword, **_):
+def print_search_result(keyword, **_):
     """Print search result by keyword."""
     gen, total = search(keyword, limit=50)
     gen = enumerate(gen, start=1)
@@ -205,7 +205,7 @@ def show_search_result(keyword, **_):
         key = input(':')
 
 
-def show_source(title_or_id, unlink_flag, redirects_flag, **_):
+def print_source(title_or_id, unlink_flag, redirects_flag, **_):
     """Print wiki source."""
     if title_or_id.isdecimal():
         source = get_page_source(int(title_or_id), redirects_flag)
@@ -217,7 +217,7 @@ def show_source(title_or_id, unlink_flag, redirects_flag, **_):
     print(source)
 
 
-def show_infobox(title_or_id, unlink_flag, redirects_flag, **_):
+def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
     """Print infoboxes and those params."""
     if title_or_id.isdecimal():
         source = get_page_source(int(title_or_id), redirects_flag)
@@ -248,7 +248,7 @@ def _main(argv):
         'search', aliases=['s'],
         help='search keyword and show titles and page_ids')
     search_parser.add_argument('keyword')
-    search_parser.set_defaults(func=show_search_result)
+    search_parser.set_defaults(func=print_search_result)
 
     get_parser = sub_parsers.add_parser(
         'get_source', aliases=['get', 'g'],
@@ -258,7 +258,7 @@ def _main(argv):
                             action='store_true', help='remove link')
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
                             action='store_false', help='resolve redirects')
-    get_parser.set_defaults(func=show_source)
+    get_parser.set_defaults(func=print_source)
 
     get_parser = sub_parsers.add_parser(
         'show_infobox', aliases=['sh'],
@@ -268,7 +268,7 @@ def _main(argv):
                             action='store_true', help='remove link')
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
                             action='store_false', help='resolve redirects')
-    get_parser.set_defaults(func=show_infobox)
+    get_parser.set_defaults(func=print_infobox)
 
     args = parser.parse_args(argv[1:])
     args.func(**vars(args))
