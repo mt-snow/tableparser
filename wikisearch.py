@@ -15,8 +15,8 @@ API_BASE_URL = 'https://ja.wikipedia.org/w/api.php?'
 
 def search(keyword, limit=10):
     """
-    search page by keyword
-    return generator object.
+    Search pages by keyword, returning
+    the generator of page soup objects and amount of total hits.
     """
     def _generator(keyword, limit):
         next_id = 0
@@ -46,7 +46,7 @@ def search(keyword, limit=10):
 
 def get_page_source(title_or_id, redirects_flag=True):
     """
-    get wiki source by title or page_id.
+    Return wiki source by title or page_id.
     """
     query = {
         'prop': 'revisions',
@@ -69,14 +69,14 @@ def get_page_source(title_or_id, redirects_flag=True):
 
 def get_page_sources(titles, redirects_flag=True):
     """
-    get wiki sources by collection of titles.
+    Return wiki sources by collection of titles.
     """
     query = {
         'prop': 'revisions',
         'rvprop': 'content',
         }
-    if (hasattr(titles, '__iter__')
-            and any(not isinstance(obj, str) for obj in titles)):
+    if (hasattr(titles, '__iter__') and
+            any(not isinstance(obj, str) for obj in titles)):
         raise TypeError('Titles_or_ids must be conllection of str.')
     query['titles'] = "|".join(titles)
     if redirects_flag:
@@ -97,7 +97,7 @@ def get_page_sources(titles, redirects_flag=True):
 
 
 def unlink(source):
-    """remove link from wiki source"""
+    """Remove link from wiki source."""
     return regex.sub(r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]',
                      lambda match: match[2] if match[2] else match[1],
                      source)
@@ -105,8 +105,8 @@ def unlink(source):
 
 def parse_infoboxes(source):
     """
-    parse infoboxes with wiki source
-    return iterator of infobox name and parameters dict.
+    Parse infoboxes with wiki source,
+    returning Iterator of infobox name and parameters dict.
     (<infobox name>, {<param name>: <param value>, ...})
     """
     infoboxes = regex.finditer(
@@ -126,8 +126,8 @@ def parse_infoboxes(source):
 
 def parse_infoboxes2(source):
     """
-    parse infoboxes with wiki source
-    return iterator of infobox name and parameters dict.
+    Parse infoboxes with wiki source,
+    returning Iterator of infobox name and parameters dict.
     (<infobox name>, {<param name>: <param value>, ...})
     """
     infoboxes = regex.finditer(
@@ -166,6 +166,7 @@ def parse_infoboxes2(source):
 
 
 def check_template_name(template_name):
+    """Check internal templates name."""
     source = get_page_source('Template:' + template_name)
     if not source:
         return None
@@ -177,9 +178,10 @@ def check_template_name(template_name):
 
 def get_api_result(query_dict):
     """
-    query wiki api
-    query_dict is media wiki format without format or action.
-    return beautiful soup xml object.
+    Call wiki api, returning beatutiful soup xml object.
+
+    Query_dict must be formed acording to media wiki api,
+    and 'format' and 'action' params overwiritten to 'xml' and 'query'.
     """
     query_dict.update({'format': 'xml', 'action': 'query'})
     query = urllib.parse.urlencode(query_dict)
@@ -188,7 +190,7 @@ def get_api_result(query_dict):
 
 
 def show_search_result(keyword, **_):
-    """print search result"""
+    """Print search result by keyword."""
     gen, total = search(keyword, limit=50)
     gen = enumerate(gen, start=1)
     print('total: %d' % total)
@@ -204,7 +206,7 @@ def show_search_result(keyword, **_):
 
 
 def show_source(title_or_id, unlink_flag, redirects_flag, **_):
-    """show wiki source"""
+    """Print wiki source."""
     if title_or_id.isdecimal():
         source = get_page_source(int(title_or_id), redirects_flag)
     else:
@@ -216,7 +218,7 @@ def show_source(title_or_id, unlink_flag, redirects_flag, **_):
 
 
 def show_infobox(title_or_id, unlink_flag, redirects_flag, **_):
-    """show infobox params"""
+    """Print infoboxes and those params."""
     if title_or_id.isdecimal():
         source = get_page_source(int(title_or_id), redirects_flag)
     else:
@@ -270,6 +272,7 @@ def _main(argv):
 
     args = parser.parse_args(argv[1:])
     args.func(**vars(args))
+
 
 if __name__ == '__main__':
     import sys
