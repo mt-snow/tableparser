@@ -180,11 +180,13 @@ def call_api(query_dict):
     """
     Call wikipedia api, returning beatutiful soup xml object.
 
-    Query_dict must be formed acording to media wiki api,
-    and 'format' and 'action' params overwiritten to 'xml' and 'query'.
+    Query_dict must be formed acording to media wiki api.
+    The 'format' and 'action' query-params is prisetted to
+    'xml' and 'query'.
     """
-    query_dict.update({'format': 'xml', 'action': 'query'})
-    query = urllib.parse.urlencode(query_dict)
+    actual_query_dict = {'format': 'xml', 'action': 'query'}
+    actual_query_dict.update(query_dict)
+    query = urllib.parse.urlencode(actual_query_dict)
     with urlopen(API_BASE_URL + query) as xml:
         return BeautifulSoup(xml.read().decode(), 'xml')
 
