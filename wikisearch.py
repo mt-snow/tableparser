@@ -44,7 +44,7 @@ def search(keyword, limit=10):
     return gen, next(gen)
 
 
-class Wikipage:
+class _Wikipage:
     """Wikipedia page parser"""
     def __init__(self, source=None, api_response=None):
         self.source = source
@@ -81,6 +81,35 @@ class Wikipage:
         if 'missing' in result.page.attrs:
             return None
         return cls(api_response=result)
+
+    @classmethod
+    def find_pages(cls, titles, redirects_flag=True):
+        """
+        Return wiki sources by collection of titles.
+        """
+        query = {
+            'prop': 'revisions',
+            'rvprop': 'content',
+            }
+        if (hasattr(titles, '__iter__') and
+                any(not isinstance(obj, str) for obj in titles)):
+            raise TypeError('Titles_or_ids must be conllection of str.')
+        query['titles'] = "|".join(titles)
+        if redirects_flag:
+            query['redirects'] = True
+
+        result = call_api(query)
+
+        return_dict = {}
+        for title in titles:
+            normalized = title
+            item = result.find(['n', 'r'], **{'from': normalized})
+            while item:
+                normalized = item['to']
+                item = result.find(['n', 'r'], **{'from': normalized})
+            page = result.find('page', title=normalized)
+            return_dict[title] = page.rev.string if page.rev else None
+        return return_dict
 
     def infoboxes_iter(self):
         """
@@ -132,35 +161,6 @@ class Wikipage:
             lambda match: match[2] if match[2] else match[1],
             self.source)
         return self
-
-
-def get_page_sources(titles, redirects_flag=True):
-    """
-    Return wiki sources by collection of titles.
-    """
-    query = {
-        'prop': 'revisions',
-        'rvprop': 'content',
-        }
-    if (hasattr(titles, '__iter__') and
-            any(not isinstance(obj, str) for obj in titles)):
-        raise TypeError('Titles_or_ids must be conllection of str.')
-    query['titles'] = "|".join(titles)
-    if redirects_flag:
-        query['redirects'] = True
-
-    result = call_api(query)
-
-    return_dict = {}
-    for title in titles:
-        normalized = title
-        item = result.find(['n', 'r'], **{'from': normalized})
-        while item:
-            normalized = item['to']
-            item = result.find(['n', 'r'], **{'from': normalized})
-        page = result.find('page', title=normalized)
-        return_dict[title] = page.rev.string if page.rev else None
-    return return_dict
 
 
 def parse_infoboxes2(source):
