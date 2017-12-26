@@ -44,27 +44,94 @@ def search(keyword, limit=10):
     return gen, next(gen)
 
 
-def get_page_source(title_or_id, redirects_flag=True):
-    """
-    Return wiki source by title or page_id.
-    """
-    query = {
-        'prop': 'revisions',
-        'rvprop': 'content',
-        }
-    if isinstance(title_or_id, int):
-        query['pageids'] = title_or_id
-    elif isinstance(title_or_id, str):
-        query['titles'] = title_or_id
-    else:
-        raise TypeError('title_or_id must be str or int.')
-    if redirects_flag:
-        query['redirects'] = True
+class Wikipage:
+    """Wikipedia page parser"""
+    def __init__(self, source=None, api_response=None):
+        self.source = source
+        self.api_response = None
+        self.pageid = None
+        self.title = None
+        if api_response is not None:
+            if 'missing' in api_response.page.attrs:
+                raise ValueError('The api_response contains no page.')
+            self.source = api_response.page.string
+            self.pageid = api_response.page['pageid']
+            self.title = api_response.page['title']
 
-    result = call_api(query)
-    if result.rev is None:
-        return None
-    return result.rev.string
+    @classmethod
+    def find_page(cls, title_or_id, redirects_flag=True):
+        """
+        Find the wikipedia page by title or page_id,
+        returning the wikipage object.
+        """
+        query = {
+            'prop': 'revisions',
+            'rvprop': 'content',
+            }
+        if isinstance(title_or_id, int):
+            query['pageids'] = title_or_id
+        elif isinstance(title_or_id, str):
+            query['titles'] = title_or_id
+        else:
+            raise TypeError('title_or_id must be str or int.')
+        if redirects_flag:
+            query['redirects'] = True
+
+        result = call_api(query)
+        if 'missing' in result.page.attrs:
+            return None
+        return cls(api_response=result)
+
+    def infoboxes_iter(self):
+        """
+        Parse infoboxes with wiki source,
+        returning Iterator of infobox name and parameters dict.
+        (<infobox name>, {<param name>: <param value>, ...})
+        """
+        infoboxes = regex.finditer(
+            r'\{\{Infobox (?P<name>[\w/]*)'
+            r'(?<content>(?:[^{}]|(?<quote>'
+            r'\{\{(?:[^{}]|(?&quote))*\}\}))*)\}\}',
+            self.source.replace('\n', ''))
+        for box in infoboxes:
+            template_name, params, _ = box.groups()
+            params = regex.findall(
+                r'\s*([^=|]+?)\s*(?:=\s*(?P<quote>(?:[^{}\[\]|]|'
+                r'\{\{(?:(?P&quote)|\|)*\}\}|'
+                r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
+                params)
+            yield template_name, OrderedDict([param[:2] for param in params])
+
+    def anime_info(self):
+        """Parse infobox animanga."""
+        infoboxes = [item for item in self.infoboxes_iter()
+                     if item[0].startswith('animanga')]
+        animes = []
+        for name, params in infoboxes:
+            if name == 'animanga/Header':
+                series_title = params.get('タイトル')
+                break
+        for name, params in infoboxes:
+            if name in ('animanga/TVAnime', 'animanga/OVA'):
+                title = params.get('タイトル', series_title)
+                director = params.get('総監督', params.get('監督'))
+                studio = params.get('アニメーション制作')
+            elif name == 'animanga/Movie':
+                title = params.get('タイトル', series_title)
+                director = params.get('総監督', params.get('監督'))
+                studio = params.get('制作')
+            else:
+                continue
+            animes.append((name, series_title, title, director, studio))
+        return animes
+
+    def unlink(self):
+        """Remove link from the page."""
+        self.source = regex.sub(
+            r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]',
+            lambda match: match[2] if match[2] else match[1],
+            self.source)
+        return self
 
 
 def get_page_sources(titles, redirects_flag=True):
@@ -94,34 +161,6 @@ def get_page_sources(titles, redirects_flag=True):
         page = result.find('page', title=normalized)
         return_dict[title] = page.rev.string if page.rev else None
     return return_dict
-
-
-def unlink(source):
-    """Remove link from wiki source."""
-    return regex.sub(r'\[\[([^\[\]|]*)(?:\|([^\[\]]*))?\]\]',
-                     lambda match: match[2] if match[2] else match[1],
-                     source)
-
-
-def parse_infoboxes(source):
-    """
-    Parse infoboxes with wiki source,
-    returning Iterator of infobox name and parameters dict.
-    (<infobox name>, {<param name>: <param value>, ...})
-    """
-    infoboxes = regex.finditer(
-        r'\{\{Infobox (?P<name>[\w/]*)'
-        r'(?<content>(?:[^{}]|(?<quote>'
-        r'\{\{(?:[^{}]|(?&quote))*\}\}))*)\}\}',
-        source.replace('\n', ''))
-    for box in infoboxes:
-        template_name, params, _ = box.groups()
-        params = regex.findall(
-            r'\s*([^=|]+?)\s*(?:=\s*(?P<quote>(?:[^{}\[\]|]|'
-            r'\{\{(?:(?P&quote)|\|)*\}\}|'
-            r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
-            params)
-        yield template_name, OrderedDict([param[:2] for param in params])
 
 
 def parse_infoboxes2(source):
@@ -167,10 +206,10 @@ def parse_infoboxes2(source):
 
 def check_template_name(template_name):
     """Check internal templates name."""
-    source = get_page_source('Template:' + template_name)
-    if not source:
+    page = Wikipage.find_page('Template:' + template_name)
+    if not page:
         return None
-    match = regex.match(r'\{\{([^|{}]*)', source)
+    match = regex.match(r'\{\{([^|{}]*)', page.source)
     if not match:
         return None
     return match.group(1).rstrip()
@@ -191,30 +230,6 @@ def call_api(query_dict):
         return BeautifulSoup(xml.read().decode(), 'xml')
 
 
-def parse_anime_info(source):
-    """Parse infobox animanga."""
-    infoboxes = [item for item in parse_infoboxes(source)
-                 if item[0].startswith('animanga')]
-    animes = []
-    for name, params in infoboxes:
-        if name == 'animanga/Header':
-            series_title = params.get('タイトル')
-            break
-    for name, params in infoboxes:
-        if name in ('animanga/TVAnime', 'animanga/OVA'):
-            title = params.get('タイトル', series_title)
-            director = params.get('総監督', params.get('監督'))
-            studio = params.get('アニメーション制作')
-        elif name == 'animanga/Movie':
-            title = params.get('タイトル', series_title)
-            director = params.get('総監督', params.get('監督'))
-            studio = params.get('制作')
-        else:
-            continue
-        animes.append((name, series_title, title, director, studio))
-    return animes
-
-
 def print_search_result(keyword, **_):
     """Print search result by keyword."""
     gen, total = search(keyword, limit=50)
@@ -233,29 +248,23 @@ def print_search_result(keyword, **_):
 
 def print_source(title_or_id, unlink_flag, redirects_flag, **_):
     """Print wiki source."""
-    if title_or_id.isdecimal():
-        source = get_page_source(int(title_or_id), redirects_flag)
-    else:
-        source = get_page_source(title_or_id, redirects_flag)
+    page = Wikipage(title_or_id, redirects_flag=redirects_flag)
 
     if unlink_flag:
-        source = unlink(source)
-    print(source)
+        page.unlink()
+    print(page.source)
 
 
 def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
     """Print infoboxes and those params."""
-    if title_or_id.isdecimal():
-        source = get_page_source(int(title_or_id), redirects_flag)
-    else:
-        source = get_page_source(title_or_id, redirects_flag)
-    if not source:
+    page = Wikipage.find_page(title_or_id, redirects_flag)
+    if not page:
         print(None)
         return
     if unlink_flag:
-        source = unlink(source)
+        page.unlink()
 
-    infoboxes = parse_infoboxes(source)
+    infoboxes = page.infoboxes_iter()
     for name, params in infoboxes:
         print('Infobox ' + name)
         for key, value in params.items():
@@ -265,15 +274,12 @@ def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
 
 def print_anime_info(title_or_id, **_):
     """Print infoboxes and those params."""
-    if title_or_id.isdecimal():
-        source = get_page_source(int(title_or_id), redirects_flag=True)
-    else:
-        source = get_page_source(title_or_id, redirects_flag=True)
-    if not source:
+    page = Wikipage.find_page(title_or_id)
+    if not page:
         print(None)
         return
-    source = unlink(source)
-    print(parse_anime_info(source))
+    page.unlink()
+    print(page.anime_info())
 
 
 def _main(argv):
@@ -292,7 +298,8 @@ def _main(argv):
     get_parser = sub_parsers.add_parser(
         'get_source', aliases=['get', 'g'],
         help='get wiki source by title or page id')
-    get_parser.add_argument('title_or_id')
+    get_parser.add_argument('title_or_id',
+                            type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
@@ -302,7 +309,8 @@ def _main(argv):
     get_parser = sub_parsers.add_parser(
         'show_infobox', aliases=['sh'],
         help='show infobox')
-    get_parser.add_argument('title_or_id')
+    get_parser.add_argument('title_or_id',
+                            type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
@@ -312,7 +320,8 @@ def _main(argv):
     anime_parser = sub_parsers.add_parser(
         'show_anime_info', aliases=['anime'],
         help='show anime')
-    anime_parser.add_argument('title_or_id')
+    anime_parser.add_argument('title_or_id',
+                              type=lambda x: int(x) if x.isdecimal() else x)
     anime_parser.set_defaults(func=print_anime_info)
 
     args = parser.parse_args(argv[1:])
