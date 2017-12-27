@@ -1,0 +1,27 @@
+tracks = 
+track = 1
+season = 1
+title := "%s %s" % (i[0], i[1])
+#title := i[1]
+show = ""
+#sortShow = ""
+#album = ""
+album = show
+#sortAlbum = ""
+#sortAlbum = sortShow
+artist = ""
+albumArtist = ""
+genre = "Anime"
+hdvideo = "1"
+network = ""
+year = date("")
+comment = "TV版, %s~%s, %s" % (year.strftime("%Y.%m"), (year + W * (tracks - track)).strftime("%Y.%m"), network)
+year =: year + W
+track =: track + 1
+episode := track
+episodeid := "S%02dE%02d" % (season, track)
+stik = "tvshow"
+#description :=
+#longdesc :=
+COMMENT_PREFIX = "//"
+
