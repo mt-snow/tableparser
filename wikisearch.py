@@ -130,25 +130,36 @@ class _Wikipage:
                                   if 'missig' not in page.attrs else None)
         return return_dict
 
+    def templates_iter(self):
+        """
+        return Iterator of templates-prams list.
+        """
+        templates = regex.finditer(
+            r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})',
+            self.source.replace('\n', ''))
+        for temp in templates:
+            contents = temp.group('contents')
+            params = regex.findall(
+                r'(?:(?P<quote>(?:[^{}\[\]|]|'
+                r'\{\{(?:(?P&quote)|\|)*\}\}|'
+                r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
+                contents)
+            yield params[:-1]
+
     def infoboxes_iter(self):
         """
         Parse infoboxes with wiki source,
         returning Iterator of infobox name and parameters dict.
         (<infobox name>, {<param name>: <param value>, ...})
         """
-        infoboxes = regex.finditer(
-            r'\{\{Infobox (?P<name>[\w/]*)'
-            r'(?<content>(?:[^{}]|(?<quote>'
-            r'\{\{(?:[^{}]|(?&quote))*\}\}))*)\}\}',
-            self.source.replace('\n', ''))
-        for box in infoboxes:
-            template_name, params, _ = box.groups()
-            params = regex.findall(
-                r'\s*([^=|]+?)\s*(?:=\s*(?P<quote>(?:[^{}\[\]|]|'
-                r'\{\{(?:(?P&quote)|\|)*\}\}|'
-                r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
-                params)
-            yield template_name, OrderedDict([param[:2] for param in params])
+        param_re = regex.compile(r'\s*(\w*)\s*=\s*(.*)$')
+        templates = self.templates_iter()
+        for name, *params in templates:
+            if not name.startswith('Infobox'):
+                continue
+            param_dict = OrderedDict([param_re.match(param).groups()
+                                      for param in params])
+            yield name, param_dict
 
     def anime_info(self):
         """Parse infobox animanga."""
@@ -286,7 +297,7 @@ def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
 
     infoboxes = page.infoboxes_iter()
     for name, params in infoboxes:
-        print('Infobox ' + name)
+        print(name)
         for key, value in params.items():
             print(key + ' = ' + value)
         print('')
