@@ -5,6 +5,7 @@
 
 import urllib.parse
 from urllib.request import urlopen
+import collections.abc
 from collections import OrderedDict
 import regex
 from bs4 import BeautifulSoup
@@ -231,6 +232,72 @@ class _Wikipage:
                 r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
                 params)
             yield template_name, OrderedDict([param[:2] for param in params])
+
+
+class _Template(collections.abc.Mapping):
+    """Wiki template object"""
+    TEMPLATE_REGEX = regex.compile(
+        r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})')
+    PARAM_REGEX = regex.compile(
+        r'(?:(?P<quote>(?:[^{}\[\]|]|'
+        r'\{\{(?:(?P&quote)|\|)*\}\}|\[\[(?:(?P&quote)|\|)*\]\]'
+        r')*)\s*=\s*)?(?P<value>(?P&quote))(?:$|\|)'
+    )
+
+    def __init__(self, source):
+        match = self.TEMPLATE_REGEX.match(source)
+        if match is None:
+            raise ValueError('There is no template.')
+        self.source = match.group(0)
+        self.name, self._params = self._get_name_and_params()
+
+    def _get_name_and_params(self):
+        # Remove '{{' and '}}'
+        contents = self.source[2:-2]
+        name_params = self.PARAM_REGEX.findall(contents)
+        name = name_params[0][1]
+
+        counter = 1
+        params = OrderedDict()
+        for key, value in name_params[1:]:
+            if key == '':
+                key = str(counter)
+                counter += 1
+            if key in params:
+                del params[key]
+            params[key] = value
+        return name, params
+
+    def __contains__(self, key):
+        return key in self._params
+
+    def __eq__(self, other):
+        return isinstance(self, _Template) and self.source == other.source
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            key = str(key)
+        return self._params[key]
+
+    def get(self, key, default=None):
+        if isinstance(key, int):
+            key = str(key)
+        return self._params.get(key, default)
+
+    def items(self):
+        return self._params.items()
+
+    def keys(self):
+        return self._params.keys()
+
+    def values(self):
+        return self._params.values()
+
+    def __len__(self):
+        return len(self._params)
+
+    def __iter__(self):
+        return iter(self._params)
 
 
 def check_template_name(template_name):
