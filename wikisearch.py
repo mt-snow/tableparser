@@ -133,19 +133,9 @@ class _Wikipage:
 
     def templates_iter(self):
         """
-        return Iterator of templates-prams list.
+        return an iterator over all templates in the page.
         """
-        templates = regex.finditer(
-            r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})',
-            self.source.replace('\n', ''))
-        for temp in templates:
-            contents = temp.group('contents')
-            params = regex.findall(
-                r'(?:(?P<quote>(?:[^{}\[\]|]|'
-                r'\{\{(?:(?P&quote)|\|)*\}\}|'
-                r'\[\[(?:(?P&quote)|\|)*\]\])*))?(?:$|\|)',
-                contents)
-            yield params[:-1]
+        return _Template.finditer(self.source)
 
     def infoboxes_iter(self):
         """
@@ -153,36 +143,31 @@ class _Wikipage:
         returning Iterator of infobox name and parameters dict.
         (<infobox name>, {<param name>: <param value>, ...})
         """
-        param_re = regex.compile(r'\s*(\w*)\s*=\s*(.*)$')
-        templates = self.templates_iter()
-        for name, *params in templates:
-            if not name.startswith('Infobox'):
-                continue
-            param_dict = OrderedDict([param_re.match(param).groups()
-                                      for param in params])
-            yield name, param_dict
+        return (temp for temp in self.templates_iter()
+                if temp.name.startswith('Infobox'))
 
     def anime_info(self):
         """Parse infobox animanga."""
         infoboxes = [item for item in self.infoboxes_iter()
-                     if item[0].startswith('animanga')]
+                     if item.name.startswith('Infobox animanga')]
         animes = []
-        for name, params in infoboxes:
-            if name == 'animanga/Header':
-                series_title = params.get('タイトル')
+        for box in infoboxes:
+            if box.name == 'Infobox animanga/Header':
+                series_title = box.get('タイトル')
                 break
-        for name, params in infoboxes:
-            if name in ('animanga/TVAnime', 'animanga/OVA'):
-                title = params.get('タイトル', series_title)
-                director = params.get('総監督', params.get('監督'))
-                studio = params.get('アニメーション制作')
-            elif name == 'animanga/Movie':
-                title = params.get('タイトル', series_title)
-                director = params.get('総監督', params.get('監督'))
-                studio = params.get('制作')
+        for box in infoboxes:
+            if box.name in ('Infobox animanga/TVAnime',
+                            'Infobox animanga/OVA'):
+                title = box.get('タイトル', series_title)
+                director = box.get('総監督', box.get('監督'))
+                studio = box.get('アニメーション制作')
+            elif box.name == 'animanga/Movie':
+                title = box.get('タイトル', series_title)
+                director = box.get('総監督', box.get('監督'))
+                studio = box.get('制作')
             else:
                 continue
-            animes.append((name, series_title, title, director, studio))
+            animes.append((box.name, series_title, title, director, studio))
         return animes
 
     def unlink(self):
@@ -239,10 +224,18 @@ class _Template(collections.abc.Mapping):
     TEMPLATE_REGEX = regex.compile(
         r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})')
     PARAM_REGEX = regex.compile(
-        r'(?:(?P<quote>(?:[^{}\[\]|]|'
-        r'\{\{(?:(?P&quote)|\|)*\}\}|\[\[(?:(?P&quote)|\|)*\]\]'
-        r')*)\s*=\s*)?(?P<value>(?P&quote))(?:$|\|)'
+        r'(?:(?P<quote>(?:[^{}\[\]|=]|'
+        r'\{\{(?:(?P&quote)|\||=)*\}\}|\[\[(?:(?P&quote)|\||=)*\]\]'
+        r')+?)\s*=\s*)?(?P<value>(?P&quote))(?:$|\|)'
     )
+
+    @classmethod
+    def finditer(cls, source):
+        """
+        Return an iterator over all mediawiki templates in the source.
+        """
+        temp_sources = cls.TEMPLATE_REGEX.finditer(source)
+        return (_Template(match.group(0)) for match in temp_sources)
 
     def __init__(self, source):
         match = self.TEMPLATE_REGEX.match(source)
@@ -255,17 +248,20 @@ class _Template(collections.abc.Mapping):
         # Remove '{{' and '}}'
         contents = self.source[2:-2]
         name_params = self.PARAM_REGEX.findall(contents)
-        name = name_params[0][1]
+        name = name_params[0][1].strip()
 
         counter = 1
         params = OrderedDict()
-        for key, value in name_params[1:]:
+        for key, value in name_params[1:-1]:
+            # Skip the first and last params,
+            # because the first is template_name
+            # and the last is empty.
             if key == '':
                 key = str(counter)
                 counter += 1
             if key in params:
                 del params[key]
-            params[key] = value
+            params[key] = value.strip()
         return name, params
 
     def __contains__(self, key):
@@ -363,9 +359,9 @@ def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
         page.unlink()
 
     infoboxes = page.infoboxes_iter()
-    for name, params in infoboxes:
-        print(name)
-        for key, value in params.items():
+    for box in infoboxes:
+        print(box.name)
+        for key, value in box.items():
             print(key + ' = ' + value)
         print('')
 
