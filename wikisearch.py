@@ -5,6 +5,7 @@
 
 import urllib.parse
 from urllib.request import urlopen
+import collections
 import collections.abc
 from collections import OrderedDict
 import regex
@@ -230,12 +231,15 @@ class _Template(collections.abc.Mapping):
     )
 
     @classmethod
-    def finditer(cls, source):
+    def finditer(cls, source, name=None):
         """
         Return an iterator over all mediawiki templates in the source.
         """
         temp_sources = cls.TEMPLATE_REGEX.finditer(source)
-        return (_Template(match.group(0)) for match in temp_sources)
+        a_filter = _Filter(name)
+        return (template for template
+                in (_Template(match.group(0)) for match in temp_sources)
+                if a_filter.check(template.name))
 
     def __init__(self, source):
         match = self.TEMPLATE_REGEX.match(source)
@@ -294,6 +298,33 @@ class _Template(collections.abc.Mapping):
 
     def __iter__(self):
         return iter(self._params)
+
+
+class _Filter:
+    def __init__(self, name=None):
+        if (name is None or
+                isinstance(name, (bool, str, collections.Callable)) or
+                hasattr(name, 'match')):
+            self.name = name
+        elif isinstance(name, collections.Iterable):
+            self.name = tuple(name)
+        else:
+            raise TypeError()
+
+    def check(self, target):
+        if self.name is None:
+            return True
+        if isinstance(self.name, bool):
+            return self.name
+        if isinstance(self.name, str):
+            return self.name == target
+        if isinstance(self.name, tuple):
+            return target in self.name
+        if hasattr(self.name, 'match'):
+            return self.name.match(target)
+        if isinstance(self.name, collections.Callable):
+            return self.name(target)
+        raise TypeError()
 
 
 def check_template_name(template_name):
