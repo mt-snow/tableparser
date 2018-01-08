@@ -132,6 +132,13 @@ class _Wikipage:
                                   if 'missig' not in page.attrs else None)
         return return_dict
 
+    def __repr__(self):
+        return '<%s title=%s pegeid=%s source=%s>' % (
+            self.__class__.__name__,
+            self.title,
+            self.pageid,
+            self.source if len(self.source) < 10 else self.source[:8] + '...')
+
     def templates_iter(self):
         """
         return an iterator over all templates in the page.
@@ -247,6 +254,9 @@ class _Template(collections.abc.Mapping):
             raise ValueError('There is no template.')
         self.source = match.group(0)
         self.name, self._params = self._get_name_and_params()
+
+    def __repr__(self):
+        return '%r(%r)' % (self.__class__.__name__, self.source)
 
     def _get_name_and_params(self):
         # Remove '{{' and '}}'
