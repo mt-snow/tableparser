@@ -236,10 +236,10 @@ class _Template(collections.abc.Mapping):
         Return an iterator over all mediawiki templates in the source.
         """
         temp_sources = cls.TEMPLATE_REGEX.finditer(source)
-        a_filter = _Filter(name)
+        a_filter = _make_filter(name)
         return (template for template
                 in (_Template(match.group(0)) for match in temp_sources)
-                if a_filter.check(template.name))
+                if a_filter(template.name))
 
     def __init__(self, source):
         match = self.TEMPLATE_REGEX.match(source)
@@ -300,31 +300,30 @@ class _Template(collections.abc.Mapping):
         return iter(self._params)
 
 
-class _Filter:
-    def __init__(self, name=None):
-        if (name is None or
-                isinstance(name, (bool, str, collections.Callable)) or
-                hasattr(name, 'match')):
-            self.name = name
-        elif isinstance(name, collections.Iterable):
-            self.name = tuple(name)
-        else:
-            raise TypeError()
-
-    def check(self, target):
-        if self.name is None:
+def _make_filter(name=None):
+    def _check(target):
+        if name is None:
             return True
-        if isinstance(self.name, bool):
-            return self.name
-        if isinstance(self.name, str):
-            return self.name == target
-        if isinstance(self.name, tuple):
-            return target in self.name
-        if hasattr(self.name, 'match'):
-            return self.name.match(target)
-        if isinstance(self.name, collections.Callable):
-            return self.name(target)
+        if isinstance(name, bool):
+            return name
+        if isinstance(name, str):
+            return name == target
+        if isinstance(name, tuple):
+            return target in name
+        if hasattr(name, 'match'):
+            return name.match(target)
+        if isinstance(name, collections.Callable):
+            return name(target)
         raise TypeError()
+
+    if not (name is None or
+            isinstance(name, (bool, str, collections.Callable)) or
+            hasattr(name, 'match')):
+        raise TypeError()
+    if (not isinstance(name, str) and
+            isinstance(name, collections.Iterable)):
+        name = tuple(name)
+    return _check
 
 
 def check_template_name(template_name):
