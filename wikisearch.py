@@ -252,8 +252,27 @@ class _Template(collections.abc.Mapping):
         match = self.TEMPLATE_REGEX.match(source)
         if match is None:
             raise ValueError('There is no template.')
-        self.source = match.group(0)
+        self._source = match.group(0)
         self.name, self._params = self._get_name_and_params()
+
+    @property
+    def source(self):
+        """
+        Return the wiki source of template.
+        If the source is not preset, genarate it from the name and params.
+        """
+        if self._source is not None:
+            return self._source
+        lines = [self.name]
+        numeric_keys = 1
+        for key, value in self.items():
+            if (regex.fullmatch(r'[0-9]+', key) and
+                    numeric_keys == int(key)):
+                lines.append(value)
+                numeric_keys += 1
+            else:
+                lines.append('%s=%s' % (key, value))
+        return '{{' + '|'.join(lines) + '}}'
 
     def __repr__(self):
         return '%r(%r)' % (self.__class__.__name__, self.source)
