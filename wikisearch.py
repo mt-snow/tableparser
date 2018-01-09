@@ -234,7 +234,7 @@ class _Template(collections.abc.Mapping):
     PARAM_REGEX = regex.compile(
         r'(?:(?P<quote>(?:[^{}\[\]|=]|'
         r'\{\{(?:(?P&quote)|\||=)*\}\}|\[\[(?:(?P&quote)|\||=)*\]\]'
-        r')+?)\s*=\s*)?(?P<value>(?P&quote))(?:$|\|)'
+        r')+?)\s*=\s*)?(?P<value>(?P&quote))(?:\Z|\|)'
     )
 
     @classmethod
@@ -266,10 +266,9 @@ class _Template(collections.abc.Mapping):
 
         counter = 1
         params = OrderedDict()
-        for key, value in name_params[1:-1]:
-            # Skip the first and last params,
-            # because the first is template_name
-            # and the last is empty.
+        for key, value in name_params[1:]:
+            # Skip the first param,
+            # because it is template_name
             if key == '':
                 key = str(counter)
                 counter += 1
