@@ -244,16 +244,31 @@ class _Template(collections.abc.Mapping):
         """
         temp_sources = cls.TEMPLATE_REGEX.finditer(source)
         a_filter = _make_filter(name)
-        return (template for template
-                in (_Template(match.group(0)) for match in temp_sources)
-                if a_filter(template.name))
 
-    def __init__(self, source):
-        match = self.TEMPLATE_REGEX.match(source)
-        if match is None:
-            raise ValueError('There is no template.')
-        self._source = match.group(0)
-        self.name, self._params = self._get_name_and_params()
+        for match in temp_sources:
+            source = match.group(0)
+            name, params = cls._get_name_and_params(source)
+            if not a_filter(name):
+                continue
+            yield _Template(source, name=name, params=params)
+
+    def __init__(self, source=None, *, name=None, params=None):
+        self._source = source
+        self.name = name
+        self._params = params
+        if source is not None:
+            match = self.TEMPLATE_REGEX.fullmatch(source)
+            if match is None:
+                raise ValueError('There is no template.')
+        if name is None or params is None:
+            if source is None:
+                raise ValueError(
+                    'Neither source nor (name, params) must be None.')
+            name, params = self._get_name_and_params(source)
+            if self.name is None:
+                self.name = name
+            if self._params is None:
+                self._params = params
 
     @property
     def source(self):
@@ -277,10 +292,11 @@ class _Template(collections.abc.Mapping):
     def __repr__(self):
         return '%r(%r)' % (self.__class__.__name__, self.source)
 
-    def _get_name_and_params(self):
+    @classmethod
+    def _get_name_and_params(cls, source):
         # Remove '{{' and '}}'
-        contents = self.source[2:-2]
-        name_params = self.PARAM_REGEX.findall(contents)
+        contents = source[2:-2]
+        name_params = cls.PARAM_REGEX.findall(contents)
         name = name_params[0][1].strip()
 
         counter = 1
