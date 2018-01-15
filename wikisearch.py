@@ -342,9 +342,6 @@ class _Template(collections.abc.Mapping):
             params[key] = value.strip()
         return name, params
 
-    def __contains__(self, key):
-        return key in self._params
-
     def __eq__(self, other):
         return isinstance(self, _Template) and self.source == other.source
 
@@ -352,20 +349,6 @@ class _Template(collections.abc.Mapping):
         if isinstance(key, int):
             key = str(key)
         return self._params[key]
-
-    def get(self, key, default=None):
-        if isinstance(key, int):
-            key = str(key)
-        return self._params.get(key, default)
-
-    def items(self):
-        return self._params.items()
-
-    def keys(self):
-        return self._params.keys()
-
-    def values(self):
-        return self._params.values()
 
     def __len__(self):
         return len(self._params)
