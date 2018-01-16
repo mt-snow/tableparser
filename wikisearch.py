@@ -6,9 +6,11 @@
 import os
 import urllib.parse
 from urllib.request import urlopen
+import itertools
 import collections
 import collections.abc
 from collections import OrderedDict
+import datetime
 import regex
 from bs4 import BeautifulSoup
 
@@ -355,6 +357,45 @@ class _Template(collections.abc.Mapping):
 
     def __iter__(self):
         return iter(self._params)
+
+
+class _BroadcastTerm(_Template):
+    def __init__(self, source=None, *, name=None, params=None):
+        super().__init__(source, name=name, params=params)
+        self._area = super().get('area', default='日本国内')
+        self._media = super().get('media', default='テレビ')
+        self._network = super().get('network')
+        self._version = super().get('version')
+        self._season = super().get('season')
+
+    def _parse_terms(self):
+        if regex.match(r'(\[\[)?[[0-9]', super().__getitem__(4)):
+            colums = 5
+        else:
+            colums = 4
+        self._headers = tuple(super(self.__class__, self).__getitem__(i)
+                              for i in range(1, colums + 1))
+        #self._terms = OrderedDict()
+        self._terms = []
+        for index in itertools.count(colums + 1, step=colums):
+            if not set(range(index, index + colums)) <= super().keys():
+                break
+            interval = self._parse_interval(super().__getitem__(index))
+            self._terms.append(interval)
+
+    def _parse_interval(self, text):
+        match = regex.match(
+            r'([0-9]+)年([0-9]+)月([0-9]+)日'
+            r'(?: - (?:(?:([0-9]+)年)?([0-9]+)月)?([0-9]+)日)?',
+            text)
+        if match is None:
+            raise ValueError('\'%s\' is not date-format.' % text)
+        start_date = datetime.date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+        end_date = datetime.date(
+            int(match.group(4) if match.group(4) else match.group(1)),
+            int(match.group(5) if match.group(5) else match.group(2)),
+            int(match.group(6) if match.group(6) else match.group(3)))
+        return start_date, end_date
 
 
 def _make_filter(name=None):
