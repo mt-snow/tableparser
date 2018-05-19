@@ -3,6 +3,7 @@
 
 """wikipedia api command"""
 
+import os
 import urllib.parse
 from urllib.request import urlopen
 import collections
@@ -13,7 +14,32 @@ from bs4 import BeautifulSoup
 
 
 API_BASE_URL = 'https://ja.wikipedia.org/w/api.php?'
-
+ANIME_INFO_TEMPLATE = """tracks = 
+track = 1
+season = 1
+title := "%s %s" % (i[0], i[1])
+#title := i[1]
+show = "{series_title}"
+#sortShow = "{series_title}"
+album = "{title}"
+#sortAlbum = ""
+#sortAlbum = sortShow
+artist = "{director}"
+albumArtist = "{studio}"
+genre = "Anime"
+hdvideo = "1"
+network = ""
+year = date("")
+comment = "TV版, %s~%s, %s" % (year.strftime("%Y.%m"), (year + W * (tracks - track)).strftime("%Y.%m"), network)
+year =: year + W
+track =: track + 1
+episode := track
+episodeid := "S%02dE%02d" % (season, track)
+stik = "tvshow"
+#description :=
+#longdesc :=
+COMMENT_PREFIX = "//"
+"""
 
 def search(keyword, limit=10):
     """
@@ -175,7 +201,8 @@ class _Wikipage:
                 studio = box.get('制作')
             else:
                 continue
-            animes.append((box.name, series_title, title, director, studio))
+            animes.append({'type': box.name, 'series_title': series_title,
+                           'title': title, 'director': director, 'studio': studio})
         return animes
 
     def unlink(self):
@@ -232,7 +259,7 @@ class _Template(collections.abc.Mapping):
     TEMPLATE_REGEX = regex.compile(
         r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})')
     PARAM_REGEX = regex.compile(
-        r'(?:(?P<quote>(?:[^{}\[\]|=]|'
+        r'\s*(?:(?P<quote>(?:[^{}\[\]|=]|'
         r'\{\{(?:(?P&quote)|\||=)*\}\}|\[\[(?:(?P&quote)|\||=)*\]\]'
         r')+?)\s*=\s*)?(?P<value>(?P&quote))(?:\Z|\|)'
     )
@@ -414,10 +441,8 @@ def print_search_result(keyword, **_):
 
 def print_source(title_or_id, unlink_flag, redirects_flag, **_):
     """Print wiki source."""
-    page = find_page(title_or_id, redirects_flag=redirects_flag)
-    if not page:
-        print(None)
-        return
+    page = _Wikipage.find_page(title_or_id, redirects_flag=redirects_flag)
+
     if unlink_flag:
         page.unlink()
     print(page.source)
@@ -447,7 +472,27 @@ def print_anime_info(title_or_id, **_):
         print(None)
         return
     page.unlink()
-    print(page.anime_info())
+    infoboxes = page.anime_info()
+    if len(infoboxes) == 0:
+        import sys
+        print('Error: "Infobox animanga" is not found.')
+        sys.exit(1)
+    for i, info in enumerate(infoboxes):
+        print('%d\t%s' % (i, info))
+    print('ID [filename]')
+    n = input('> ').split()
+    if len(n) == 1:
+        n = n[0]
+        filename = os.environ['HOME'] + '/title.txt'
+    elif len(n) == 2:
+        filename = n[0]
+        n = n[1]
+    else:
+        import sys
+        print('Error')
+        sys.exit(1)
+    with open(filename, mode='w') as f:
+        print(ANIME_INFO_TEMPLATE.format(**infoboxes[int(n)]), file=f)
 
 
 def _main(argv):
@@ -479,8 +524,8 @@ def _main(argv):
         help='show infobox')
     get_parser.add_argument('title_or_id',
                             type=lambda x: int(x) if x.isdecimal() else x)
-    get_parser.add_argument('--unlink', dest='unlink_flag',
-                            action='store_true', help='remove link')
+    get_parser.add_argument('--disable-unlink', dest='unlink_flag',
+                            action='store_false', help='remove link', default=True)
     get_parser.add_argument('--no-redirects', dest='redirects_flag',
                             action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=print_infobox)
