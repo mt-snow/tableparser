@@ -423,20 +423,15 @@ def call_api(query_dict):
         return BeautifulSoup(xml.read().decode(), 'xml')
 
 
-def print_search_result(keyword, **_):
+def print_search_result(keyword, limit=0, **_):
     """Print search result by keyword."""
     gen, total = search(keyword, limit=50)
     gen = enumerate(gen, start=1)
     print('total: %d' % total)
-    key = ''
-    while 'q' not in key:
-        print('#\tpageid\ttitle')
-        for _ in range(10):
-            try:
-                print("{0}\t{1[pageid]}\t{1[title]}".format(*next(gen)))
-            except StopIteration:
-                return
-        key = input(':')
+    print('#\tpageid\ttitle')
+    iterator = zip(range(limit), gen) if limit > 0 else enumerate(gen)
+    for _, item in iterator:
+        print("{0}\t{1[pageid]}\t{1[title]}".format(*item))
 
 
 def print_source(title_or_id, unlink_flag, redirects_flag, **_):
@@ -506,6 +501,8 @@ def _main(argv):
         'search', aliases=['s'],
         help='search keyword and show titles and page_ids')
     search_parser.add_argument('keyword')
+    search_parser.add_argument('-l', '--limit', type=int, default=10,
+                               help='max of printing serch result')
     search_parser.set_defaults(func=print_search_result)
 
     get_parser = sub_parsers.add_parser(
