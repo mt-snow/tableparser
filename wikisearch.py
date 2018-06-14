@@ -41,6 +41,8 @@ stik = "tvshow"
 COMMENT_PREFIX = "//"
 """
 
+_DEBUG_API = False
+
 def search(keyword, limit=10):
     """
     Search pages by keyword, returning
@@ -419,8 +421,14 @@ def call_api(query_dict):
     actual_query_dict = {'format': 'xml', 'action': 'query'}
     actual_query_dict.update(query_dict)
     query = urllib.parse.urlencode(actual_query_dict)
+    if _DEBUG_API:
+        print('QUERRY: ' + str(actual_query_dict), file=sys.stderr)
+        print('URLOPEN: ' + API_BASE_URL + query, file=sys.stderr)
     with urlopen(API_BASE_URL + query) as xml:
-        return BeautifulSoup(xml.read().decode(), 'xml')
+        result = BeautifulSoup(xml.read().decode(), 'xml')
+        if _DEBUG_API:
+            print('RESULT:\n' + result.prettify(), file=sys.stderr)
+        return result
 
 
 def print_search_result(keyword, limit=0, **_):
