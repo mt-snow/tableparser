@@ -65,6 +65,7 @@ def search(keyword, limit=10):
                 next_id += 1
                 yield item.attrs
             if soup.find('continue'):
+                query.update(soup.find('continue').attrs)
                 soup = call_api(query)
             else:
                 break
