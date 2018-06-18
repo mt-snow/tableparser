@@ -235,11 +235,6 @@ class _Template(collections.abc.Mapping):
     """Wiki template object"""
     TEMPLATE_REGEX = regex.compile(
         r'(?<quote>\{\{(?<contents>(?:[^{}]|(?&quote))*)\}\})')
-    PARAM_REGEX = regex.compile(
-        r'\s*(?:(?P<quote>(?:[^{}\[\]|=]|'
-        r'\{\{(?:(?P&quote)|\||=)*\}\}|\[\[(?:(?P&quote)|\||=)*\]\]'
-        r')+?)\s*=\s*)?(?P<value>(?P&quote))(?:\Z|\|)'
-    )
 
     @classmethod
     def finditer(cls, source, name=None):
@@ -298,23 +293,36 @@ class _Template(collections.abc.Mapping):
 
     @classmethod
     def _get_name_and_params(cls, source):
+        def _split_params(text):
+            nest = ''
+            key = None
+            start = 0
+            counter = 1
+            for i, char in enumerate(text):
+                if nest:
+                    if char == nest[-1]:
+                        nest = nest[:-1]
+                    continue
+                if char == '=' and not key:
+                    key = text[start:i].strip()
+                    start = i + 1
+                elif char == '|':
+                    value = text[start:i].strip()
+                    if key == '':
+                        key = str(counter)
+                        counter += 1
+                    yield key, value
+                    start = i + 1
+                    key = ''
+                elif char in '{[':
+                    nest += char
+            value = text[start:].strip()
+            yield (key, value) if key != '' else (str(counter), value)
+
         # Remove '{{' and '}}'
         contents = source[2:-2]
-        name_params = cls.PARAM_REGEX.findall(contents)
-        name = name_params[0][1].strip()
-
-        counter = 1
-        params = OrderedDict()
-        for key, value in name_params[1:]:
-            # Skip the first param,
-            # because it is template_name
-            if key == '':
-                key = str(counter)
-                counter += 1
-            if key in params:
-                del params[key]
-            params[key] = value.strip()
-        return name, params
+        gen = _split_params(contents)
+        return next(gen)[1], OrderedDict(gen)
 
     def __contains__(self, key):
         return key in self._params
