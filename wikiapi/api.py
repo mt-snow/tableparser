@@ -142,11 +142,11 @@ class _Wikipage:
             self.pageid,
             self.source if len(self.source) < 10 else self.source[:8] + '...')
 
-    def templates_iter(self):
+    def templates_iter(self, name=None):
         """
         return an iterator over all templates in the page.
         """
-        return _Template.finditer(self.source)
+        return _Template.finditer(self.source, name)
 
     def infoboxes_iter(self):
         """
@@ -154,13 +154,11 @@ class _Wikipage:
         returning Iterator of infobox name and parameters dict.
         (<infobox name>, {<param name>: <param value>, ...})
         """
-        return (temp for temp in self.templates_iter()
-                if temp.name.startswith('Infobox'))
+        return self.templates_iter(lambda x: x.startswith('Infobox'))
 
     def anime_info(self):
         """Parse infobox animanga."""
-        infoboxes = [item for item in self.infoboxes_iter()
-                     if item.name.startswith('Infobox animanga')]
+        infoboxes = list(self.templates_iter(lambda x: x.startswith('Infobox animanga')))
         animes = []
         for box in infoboxes:
             if box.name == 'Infobox animanga/Header':
