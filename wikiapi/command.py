@@ -123,7 +123,7 @@ def _main(argv):
     get_parser.set_defaults(func=print_source)
 
     get_parser = sub_parsers.add_parser(
-        'show_infobox', aliases=['sh'],
+        'infobox', aliases=['info'],
         help='show infobox')
     get_parser.add_argument('title_or_id',
                             type=lambda x: int(x) if x.isdecimal() else x)
@@ -134,8 +134,7 @@ def _main(argv):
     get_parser.set_defaults(func=print_infobox)
 
     anime_parser = sub_parsers.add_parser(
-        'show_anime_info', aliases=['anime'],
-        help='show anime')
+        'anime', help='show anime')
     anime_parser.add_argument('title_or_id',
                               type=lambda x: int(x) if x.isdecimal() else x)
     anime_parser.set_defaults(func=print_anime_info)
