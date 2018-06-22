@@ -4,13 +4,13 @@
 """wikipedia api"""
 
 import sys
+import json
 import urllib.parse
 from urllib.request import urlopen
 import collections
 import collections.abc
 from collections import OrderedDict
 import regex
-from bs4 import BeautifulSoup
 
 
 API_BASE_URL = 'https://ja.wikipedia.org/w/api.php?'
@@ -30,17 +30,17 @@ def search(keyword, limit=10):
             'srlimit': limit,
             'srprop': 'titlesnippet',
             }
-        soup = call_api(query)
-        yield int(soup.searchinfo['totalhits'])
+        response = call_api(query)
+        yield int(response['query']['searchinfo']['totalhits'])
 
         while True:
-            items = soup.find_all('p')
+            items = response['query']['search']
             for item in items:
                 next_id += 1
-                yield item.attrs
-            if soup.find('continue'):
-                query.update(soup.find('continue').attrs)
-                soup = call_api(query)
+                yield item
+            if 'continue' in response:
+                query.update(response['continue'])
+                response = call_api(query)
             else:
                 break
 
@@ -101,7 +101,8 @@ class _Wikipage:
             query['redirects'] = True
 
         result = call_api(query)
-        if 'missing' in result.page.attrs:
+        page = next(iter(result['query']['pages'].items()))
+        if 'missing' in page[1]
             return None
         return cls(api_response=result)
 
@@ -359,14 +360,14 @@ def call_api(query_dict):
     The 'format' and 'action' query-params is prisetted to
     'xml' and 'query'.
     """
-    actual_query_dict = {'format': 'xml', 'action': 'query'}
+    actual_query_dict = {'format': 'json', 'action': 'query'}
     actual_query_dict.update(query_dict)
     query = urllib.parse.urlencode(actual_query_dict)
     if _DEBUG_API:
         print('QUERRY: ' + str(actual_query_dict), file=sys.stderr)
         print('URLOPEN: ' + API_BASE_URL + query, file=sys.stderr)
-    with urlopen(API_BASE_URL + query) as xml:
-        result = BeautifulSoup(xml.read().decode(), 'xml')
+    with urlopen(API_BASE_URL + query) as response:
+        result = json.load(response)
         if _DEBUG_API:
-            print('RESULT:\n' + result.prettify(), file=sys.stderr)
+            print('RESULT:\n' + result, file=sys.stderr)
         return result
