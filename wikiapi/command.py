@@ -5,6 +5,8 @@
 
 import os
 import api
+import platform
+import subprocess
 
 
 ANIME_INFO_TEMPLATE = """tracks = 
@@ -46,18 +48,52 @@ def print_search_result(keyword, limit=0, **_):
         print("{0}\t{1[pageid]}\t{1[title]}".format(*item))
 
 
-def print_source(title_or_id, unlink_flag, redirects_flag, **_):
+def print_source(title_or_id, unlink_flag, is_redirectable, **_):
     """Print wiki source."""
-    page = api.find_page(title_or_id, redirects_flag=redirects_flag)
+    if isinstance(title_or_id, str):
+        page = api.find_page(title=title_or_id, is_redirectable=is_redirectable)
+    elif isinstance(title_or_id, int):
+        page = api.find_page(pageid=title_or_id, is_redirectable=is_redirectable)
+    else:
+        return
 
+    if not page:
+        print('Page "%s" is not found.' % title_or_id, file=sys.stderr)
+        return 1
     if unlink_flag:
         page.unlink()
     print(page.source)
 
 
-def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
+def open_page(title_or_id, **_):
+    if isinstance(title_or_id, str):
+        page = api.find_page(title=title_or_id, is_redirectable=False)
+    elif isinstance(title_or_id, int):
+        page = api.find_page(pageid=title_or_id, is_redirectable=False)
+    else:
+        return
+
+    if not page:
+        print('Page "%s" is not found.' % title_or_id, file=sys.stderr)
+        return 1
+    if sys.platform == 'darwin':
+        subprocess.run(['open', page.url])
+    elif sys.platform in ['win32', 'cygwin']:
+        subprocess.run(['explorer.exe', page.url])
+    else:
+        print('Not support', file=sys.stderr)
+        return 1
+
+
+def print_infobox(title_or_id, unlink_flag, is_redirectable, **_):
     """Print infoboxes and those params."""
-    page = api.find_page(title_or_id, redirects_flag=redirects_flag)
+    if isinstance(title_or_id, str):
+        page = api.find_page(title=title_or_id, is_redirectable=is_redirectable)
+    elif isinstance(title_or_id, int):
+        page = api.find_page(pageid=title_or_id, is_redirectable=is_redirectable)
+    else:
+        return
+
     if not page:
         print(None)
         return
@@ -111,6 +147,14 @@ def _main(argv):
                                help='max of printing serch result')
     search_parser.set_defaults(func=print_search_result)
 
+    open_parser = sub_parsers.add_parser(
+            'open',
+            help='open page in defautl browser'
+            )
+    open_parser.add_argument('title_or_id',
+                            type=lambda x: int(x) if x.isdecimal() else x)
+    open_parser.set_defaults(func=open_page)
+
     get_parser = sub_parsers.add_parser(
         'get_source', aliases=['get', 'g'],
         help='get wiki source by title or page id')
@@ -118,8 +162,8 @@ def _main(argv):
                             type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
-    get_parser.add_argument('--no-redirects', dest='redirects_flag',
-                            action='store_false', help='resolve redirects')
+    get_parser.add_argument('--no-redirects', dest='is_redirectable',
+                            action='store_false', help='resolve redirects', default=True)
     get_parser.set_defaults(func=print_source)
 
     get_parser = sub_parsers.add_parser(
@@ -129,7 +173,7 @@ def _main(argv):
                             type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--disable-unlink', dest='unlink_flag',
                             action='store_false', help='remove link', default=True)
-    get_parser.add_argument('--no-redirects', dest='redirects_flag',
+    get_parser.add_argument('--no-redirects', dest='is_redirectable',
                             action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=print_infobox)
 
@@ -140,7 +184,7 @@ def _main(argv):
     anime_parser.set_defaults(func=print_anime_info)
 
     args = parser.parse_args(argv[1:])
-    args.func(**vars(args))
+    sys.exit(args.func(**vars(args)))
 
 
 if __name__ == '__main__':

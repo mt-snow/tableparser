@@ -49,90 +49,86 @@ def search(keyword, limit=10):
     return gen, next(gen)
 
 
-def find_page(title_or_id, redirects_flag=True):
+def find_page(title=None, pageid=None, is_redirectable=True):
     """
     Find the wikipedia page by title or page_id,
     returning the wikipage object.
     """
-    return _Wikipage.find_page(title_or_id, redirects_flag=redirects_flag)
+    return _Wikipage.find_page(title=title, pageid=pageid, is_redirectable=is_redirectable)
 
 
-def find_pages(titles, redirects_flag=True):
+def find_pages(titles=None, pageids=None, is_redirectable=True):
     """
     Return wiki sources by collection of titles.
     """
-    return _Wikipage.find_pages(titles, redirects_flag=redirects_flag)
+    return _Wikipage.find_pages(titles=titles, pageids=pageids, is_redirectable=is_redirectable)
 
 
 class _Wikipage:
     """Wikipedia page parser"""
-    def __init__(self, source=None, api_response=None, page=None):
-        self.source = source
-        self.api_response = api_response
-        self.page = page
+    def __init__(self, revision=None, info=None):
+        self.revision = revision
+        self.info = info
         self.pageid = None
         self.title = None
-        if page is None and api_response is not None:
-            self.page = api_response['query']['pages'].popitem()[1]
-        if self.page is not None:
-            if 'missing' in self.page:
-                raise ValueError('The api_response contains no page.')
-            self.source = self.page['revisions'][0]['*']
-            self.pageid = self.page['pageid']
-            self.title = self.page['title']
+        self.url = None
+        self.source = revision['*']
+        if info is None:
+            return
+        self.title = info['title']
+        self.pageid = info['pageid']
+        self.url = info['fullurl']
 
     @classmethod
-    def find_page(cls, title_or_id, redirects_flag=True):
+    def find_page(cls, title=None, pageid=None, is_redirectable=True):
         """
         Find the wikipedia page by title or page_id,
         returning the wikipage object.
         """
-        query = {
-            'prop': 'revisions',
-            'rvprop': 'content',
-            }
-        if isinstance(title_or_id, int):
-            query['pageids'] = title_or_id
-        elif isinstance(title_or_id, str):
-            query['titles'] = title_or_id
+        if title and not pageid:
+            return cls.find_pages(titles=[title], is_redirectable=is_redirectable)[title]
+        elif not title and pageid:
+            return cls.find_pages(pageids=[pageid], is_redirectable=is_redirectable)[pageid]
         else:
-            raise TypeError('title_or_id must be str or int.')
-        if redirects_flag:
-            query['redirects'] = True
-
-        result = call_api(query)
-        page = next(iter(result['query']['pages'].items()))
-        if 'missing' in page[1]:
-            return None
-        return cls(api_response=result)
+            raise ValueError('must give either title or pageid, but not both')
 
     @classmethod
-    def find_pages(cls, titles, redirects_flag=True):
+    def find_pages(cls, titles=None, pageids=None, is_redirectable=True):
         """
         Return wiki sources by collection of titles.
         """
-        query = {
-            'prop': 'revisions',
-            'rvprop': 'content',
-            }
-        if (hasattr(titles, '__iter__') and
-                any(not isinstance(obj, str) for obj in titles)):
-            raise TypeError('Titles_or_ids must be conllection of str.')
-        query['titles'] = "|".join(titles)
-        if redirects_flag:
+        query = {}
+        if titles and not pageids:
+            query['titles'] = '|'.join(titles)
+        elif not titles and pageids:
+            query['pageids'] = '|'.join(str(pageid) for pageid in pageids)
+        else:
+            raise ValueError('must give either titles or pageids, but not both')
+
+        if is_redirectable:
+            if pageids:
+                noredirects_info = get_urls(**query)
             query['redirects'] = True
 
-        result = call_api(query)
-        redirects = dict((i['from'], i['to']) for i in result['query'].get('redirects', {}))
-        pages = result['query']['pages']
+        revisions = get_revisions(**query)
+        info = get_urls(**query)
+        redirect_map = dict((i['from'], i['to']) for i in info['query'].get('redirects', {}))
+        redirect_map.update((i['from'], i['to']) for i in info['query'].get('normalized', {}))
+        if pageids:
+            pages = (noredirects_info if is_redirectable else info)['query']['pages']
+            pageid_map = dict((page['pageid'], page['title']) for page in pages.values())
+            titles = [pageid_map[pageid] for pageid in pageids]
+
+        pages = revisions['query']['pages']
 
         return_dict = {}
-        for title in titles:
+        for key, title in zip((pageids if pageids else titles), titles):
             normalized = title
-            while normalized in redirects:
-                normalized = redirects[normalized]
+            while normalized in redirect_map:
+                normalized = redirect_map[normalized]
             page = [v for v in pages.values() if v['title'] == normalized][0]
-            return_dict[title] = (cls(api_response=result, page=page)
+            return_dict[key] = (cls(revision=page['revisions'][0],
+                                    info=info['query']['pages'][str(page['pageid'])])
                                   if 'missing' not in page else None)
         return return_dict
 
@@ -371,3 +367,22 @@ def call_api(query_dict):
         if _DEBUG_API:
             print('RESULT:\n' + result, file=sys.stderr)
         return result
+
+
+def get_urls(**keywords):
+    query = {
+            'prop': 'info',
+            'inprop': 'url',
+            }
+    query.update(keywords)
+    return call_api(query)
+
+
+def get_revisions(**keywords):
+    query = {
+        'prop': 'revisions',
+        'rvprop': 'content',
+        }
+    query.update(keywords)
+    return call_api(query)
+
