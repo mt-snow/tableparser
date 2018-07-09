@@ -46,18 +46,18 @@ def print_search_result(keyword, limit=0, **_):
         print("{0}\t{1[pageid]}\t{1[title]}".format(*item))
 
 
-def print_source(title_or_id, unlink_flag, redirects_flag, **_):
+def print_source(title_or_id, unlink_flag, is_redirectable, **_):
     """Print wiki source."""
-    page = api.find_page(title_or_id, redirects_flag=redirects_flag)
+    page = api.find_page(title_or_id, is_redirectable=is_redirectable)
 
     if unlink_flag:
         page.unlink()
     print(page.source)
 
 
-def print_infobox(title_or_id, unlink_flag, redirects_flag, **_):
+def print_infobox(title_or_id, unlink_flag, is_redirectable, **_):
     """Print infoboxes and those params."""
-    page = api.find_page(title_or_id, redirects_flag=redirects_flag)
+    page = api.find_page(title_or_id, is_redirectable=is_redirectable)
     if not page:
         print(None)
         return
@@ -118,7 +118,7 @@ def _main(argv):
                             type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--unlink', dest='unlink_flag',
                             action='store_true', help='remove link')
-    get_parser.add_argument('--no-redirects', dest='redirects_flag',
+    get_parser.add_argument('--no-redirects', dest='is_redirectable',
                             action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=print_source)
 
@@ -129,7 +129,7 @@ def _main(argv):
                             type=lambda x: int(x) if x.isdecimal() else x)
     get_parser.add_argument('--disable-unlink', dest='unlink_flag',
                             action='store_false', help='remove link', default=True)
-    get_parser.add_argument('--no-redirects', dest='redirects_flag',
+    get_parser.add_argument('--no-redirects', dest='is_redirectable',
                             action='store_false', help='resolve redirects')
     get_parser.set_defaults(func=print_infobox)
 
