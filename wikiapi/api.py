@@ -49,19 +49,19 @@ def search(keyword, limit=10):
     return gen, next(gen)
 
 
-def find_page(title_or_id, is_redirectable=True):
+def find_page(title=None, pageid=None, is_redirectable=True):
     """
     Find the wikipedia page by title or page_id,
     returning the wikipage object.
     """
-    return _Wikipage.find_page(title_or_id, is_redirectable=is_redirectable)
+    return _Wikipage.find_page(title=title, pageid=pageid, is_redirectable=is_redirectable)
 
 
-def find_pages(titles, is_redirectable=True):
+def find_pages(titles=None, pageids=None, is_redirectable=True):
     """
     Return wiki sources by collection of titles.
     """
-    return _Wikipage.find_pages(titles, is_redirectable=is_redirectable)
+    return _Wikipage.find_pages(titles=titles, pageids=pageids, is_redirectable=is_redirectable)
 
 
 class _Wikipage:
@@ -80,12 +80,17 @@ class _Wikipage:
         self.url = info['fullurl']
 
     @classmethod
-    def find_page(cls, title, is_redirectable=True):
+    def find_page(cls, title=None, pageid=None, is_redirectable=True):
         """
         Find the wikipedia page by title or page_id,
         returning the wikipage object.
         """
-        return list(cls.find_pages(titles=[title]).values())[0]
+        if title and not pageid:
+            return cls.find_pages(titles=[title], is_redirectable=is_redirectable)[title]
+        elif not title and pageid:
+            return cls.find_pages(pageids=[pageid], is_redirectable=is_redirectable)[pageid]
+        else:
+            raise ValueError('must give either title or pageid, but not both')
 
     @classmethod
     def find_pages(cls, titles=None, pageids=None, is_redirectable=True):
@@ -96,7 +101,7 @@ class _Wikipage:
         if titles and not pageids:
             query['titles'] = '|'.join(titles)
         elif not titles and pageids:
-            query['pageids'] = '|'.join(pageids)
+            query['pageids'] = '|'.join(str(pageid) for pageid in pageids)
         else:
             raise ValueError('must give either titles or pageids, but not both')
 
@@ -108,6 +113,7 @@ class _Wikipage:
         revisions = get_revisions(**query)
         info = get_urls(**query)
         redirect_map = dict((i['from'], i['to']) for i in info['query'].get('redirects', {}))
+        redirect_map.update((i['from'], i['to']) for i in info['query'].get('normalized', {}))
         if pageids:
             pages = (noredirects_info if is_redirectable else info)['query']['pages']
             pageid_map = dict((page['pageid'], page['title']) for page in pages.values())
