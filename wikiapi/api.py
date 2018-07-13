@@ -10,6 +10,7 @@ from urllib.request import urlopen
 import collections
 import collections.abc
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 import regex
 
 
@@ -105,21 +106,25 @@ class _Wikipage:
         else:
             raise ValueError('must give either titles or pageids, but not both')
 
+        executor = ThreadPoolExecutor()
+
         if is_redirectable:
             if pageids:
-                noredirects_info = get_urls(**query)
+                noredirects_future = executor.submit(get_urls, **query)
             query['redirects'] = True
 
-        revisions = get_revisions(**query)
-        info = get_urls(**query)
+        info_future = executor.submit(get_urls, **query)
+        revisions_future = executor.submit(get_revisions, **query)
+        info = info_future.result()
+
         redirect_map = dict((i['from'], i['to']) for i in info['query'].get('redirects', {}))
         redirect_map.update((i['from'], i['to']) for i in info['query'].get('normalized', {}))
         if pageids:
-            pages = (noredirects_info if is_redirectable else info)['query']['pages']
+            pages = (noredirects_future.result() if is_redirectable else info)['query']['pages']
             pageid_map = dict((page['pageid'], page['title']) for page in pages.values())
             titles = [pageid_map[pageid] for pageid in pageids]
 
-        pages = revisions['query']['pages']
+        pages = revisions_future.result()['query']['pages']
 
         return_dict = {}
         for key, title in zip((pageids if pageids else titles), titles):
