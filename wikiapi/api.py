@@ -201,15 +201,32 @@ class _Template(collections.abc.Mapping):
         """
         Return an iterator over all mediawiki templates in the source.
         """
-        temp_sources = cls.TEMPLATE_REGEX.finditer(source)
         a_filter = _make_filter(name)
-
-        for match in temp_sources:
-            source = match.group(0)
-            name, params = cls._get_name_and_params(source)
-            if not a_filter(name):
-                continue
-            yield _Template(source, name=name, params=params)
+        char_iter = enumerate(zip(source, source[1:]))
+        unclosed_templates = []
+        closed_templates = []
+        try:
+            while True:
+                char_no, chars = next(char_iter)
+                if chars == ('{', '{'):
+                    unclosed_templates.append(char_no)
+                    next(char_iter)
+                elif chars == ('}', '}'):
+                    if not unclosed_templates:
+                        raise ValueError('Source has syntax error')
+                    start_charno = unclosed_templates.pop()
+                    closed_templates.append(slice(start_charno, char_no + 2))
+                    next(char_iter)
+                    if unclosed_templates:
+                        continue
+                    closed_templates.sort()
+                    for temp in closed_templates:
+                        a_name, params = cls._get_name_and_params(source[temp])
+                        if a_filter(a_name):
+                            yield cls(source[temp], name=a_name, params=params)
+                    del closed_templates[:]
+        except StopIteration:
+            pass
 
     def __init__(self, source=None, *, name=None, params=None):
         self._source = source
