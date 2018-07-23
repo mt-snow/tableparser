@@ -18,6 +18,7 @@ API_BASE_URL = 'https://ja.wikipedia.org/w/api.php?'
 
 _DEBUG_API = False
 
+
 def search(keyword, limit=10):
     """
     Search pages by keyword, returning
@@ -55,14 +56,16 @@ def find_page(title=None, pageid=None, is_redirectable=True):
     Find the wikipedia page by title or page_id,
     returning the wikipage object.
     """
-    return _Wikipage.find_page(title=title, pageid=pageid, is_redirectable=is_redirectable)
+    return _Wikipage.find_page(title=title, pageid=pageid,
+                               is_redirectable=is_redirectable)
 
 
 def find_pages(titles=None, pageids=None, is_redirectable=True):
     """
     Return wiki sources by collection of titles.
     """
-    return _Wikipage.find_pages(titles=titles, pageids=pageids, is_redirectable=is_redirectable)
+    return _Wikipage.find_pages(titles=titles, pageids=pageids,
+                                is_redirectable=is_redirectable)
 
 
 class _Wikipage:
@@ -87,9 +90,11 @@ class _Wikipage:
         returning the wikipage object.
         """
         if title and not pageid:
-            return cls.find_pages(titles=[title], is_redirectable=is_redirectable)[title]
+            return cls.find_pages(titles=[title],
+                                  is_redirectable=is_redirectable)[title]
         elif not title and pageid:
-            return cls.find_pages(pageids=[pageid], is_redirectable=is_redirectable)[pageid]
+            return cls.find_pages(pageids=[pageid],
+                                  is_redirectable=is_redirectable)[pageid]
         else:
             raise ValueError('must give either title or pageid, but not both')
 
@@ -104,7 +109,8 @@ class _Wikipage:
         elif not titles and pageids:
             query['pageids'] = '|'.join(str(pageid) for pageid in pageids)
         else:
-            raise ValueError('must give either titles or pageids, but not both')
+            raise ValueError(
+                'must give either titles or pageids, but not both')
 
         executor = ThreadPoolExecutor()
 
@@ -117,11 +123,15 @@ class _Wikipage:
         revisions_future = executor.submit(get_revisions, **query)
         info = info_future.result()
 
-        redirect_map = dict((i['from'], i['to']) for i in info['query'].get('redirects', {}))
-        redirect_map.update((i['from'], i['to']) for i in info['query'].get('normalized', {}))
+        redirect_map = dict((i['from'], i['to'])
+                            for i in info['query'].get('redirects', {}))
+        redirect_map.update((i['from'], i['to'])
+                            for i in info['query'].get('normalized', {}))
         if pageids:
-            pages = (noredirects_future.result() if is_redirectable else info)['query']['pages']
-            pageid_map = dict((page['pageid'], page['title']) for page in pages.values())
+            pages = (noredirects_future.result()
+                     if is_redirectable else info)['query']['pages']
+            pageid_map = dict((page['pageid'], page['title'])
+                              for page in pages.values())
             titles = [pageid_map[pageid] for pageid in pageids]
 
         pages = revisions_future.result()['query']['pages']
@@ -133,8 +143,9 @@ class _Wikipage:
                 normalized = redirect_map[normalized]
             page = [v for v in pages.values() if v['title'] == normalized][0]
             return_dict[key] = (cls(revision=page['revisions'][0],
-                                    info=info['query']['pages'][str(page['pageid'])])
-                                  if 'missing' not in page else None)
+                                    info=info['query']['pages'][
+                                        str(page['pageid'])])
+                                if 'missing' not in page else None)
         return return_dict
 
     def __repr__(self):
@@ -160,7 +171,8 @@ class _Wikipage:
 
     def anime_info(self):
         """Parse infobox animanga."""
-        infoboxes = list(self.templates_iter(lambda x: x.startswith('Infobox animanga')))
+        infoboxes = list(self.templates_iter(
+            lambda x: x.startswith('Infobox animanga')))
         animes = []
         for box in infoboxes:
             if box.name == 'Infobox animanga/Header':
@@ -179,7 +191,8 @@ class _Wikipage:
             else:
                 continue
             animes.append({'type': box.name, 'series_title': series_title,
-                           'title': title, 'director': director, 'studio': studio})
+                           'title': title, 'director': director,
+                           'studio': studio})
         return animes
 
     def unlink(self):
@@ -392,19 +405,20 @@ def call_api(query_dict):
 
 
 def get_urls(**keywords):
+    """Get url by mediawiki api"""
     query = {
-            'prop': 'info',
-            'inprop': 'url',
-            }
+        'prop': 'info',
+        'inprop': 'url',
+        }
     query.update(keywords)
     return call_api(query)
 
 
 def get_revisions(**keywords):
+    """Get revision by mediawiki api"""
     query = {
         'prop': 'revisions',
         'rvprop': 'content',
         }
     query.update(keywords)
     return call_api(query)
-
